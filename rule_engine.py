@@ -4,10 +4,11 @@ def evaluate_stroke(stroke_class_id, landmarks):
     """
     Avalia a biomecânica do golpe baseando-se nos ângulos articulares.
     0 = Forehand, 1 = Backhand, 2 = Saque.
-    Retorna uma string de feedback e um dicionário de ângulos importantes calculados.
+    Retorna uma string de feedback, um dicionário de ângulos e uma lista de juntas com erro.
     """
     feedback = []
     angles = {}
+    failed_joints = []
     
     # Assumindo jogador destro para as regras base.
     # Em um sistema completo, isso seria configurável.
@@ -18,6 +19,7 @@ def evaluate_stroke(stroke_class_id, landmarks):
         
         if elbow_angle < 120:
             feedback.append("Cotovelo muito flexionado no impacto")
+            failed_joints.append("cotovelo_dir")
         else:
             feedback.append("Boa extensão do braço")
             
@@ -27,6 +29,7 @@ def evaluate_stroke(stroke_class_id, landmarks):
         
         if elbow_angle_l < 110:
             feedback.append("Cotovelo esquerdo muito flexionado")
+            failed_joints.append("cotovelo_esq")
         else:
             feedback.append("Braço firme no backhand")
             
@@ -40,10 +43,11 @@ def evaluate_stroke(stroke_class_id, landmarks):
         avg_knee = (knee_angle_r + knee_angle_l) / 2
         if avg_knee > 150:
             feedback.append("Dobre mais os joelhos (flexão pobre)")
+            failed_joints.extend(["joelho_dir", "joelho_esq"])
         else:
             feedback.append("Boa flexão para impulsão do saque")
             
     else:
         feedback.append("Aguardando golpe válido...")
         
-    return " | ".join(feedback), angles
+    return " | ".join(feedback), angles, failed_joints

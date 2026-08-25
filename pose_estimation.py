@@ -7,6 +7,14 @@ from mediapipe.tasks.python.vision import drawing_utils
 from mediapipe.tasks.python.vision import drawing_styles
 import numpy as np
 import collections
+import serial
+
+MAPA_LEDS = {
+    "ombro_esq": b'A', "ombro_dir": b'B', "cotovelo_esq": b'C', 
+    "cotovelo_dir": b'D', "pulso_esq": b'E', "pulso_dir": b'F',
+    "quadril_esq": b'G', "quadril_dir": b'H', "joelho_esq": b'I', 
+    "joelho_dir": b'J', "tornozelo_esq": b'K', "tornozelo_dir": b'L'
+}
 
 # Tenta importar torch, mas lida com o caso de não estar instalado
 try:
@@ -65,6 +73,15 @@ def main():
     current_feedback = ""
     feedback_time = 0
 
+    # Inicialização da porta Serial do Arduino (Painel IoT)
+    try:
+        feedback_arduino = serial.Serial('COM4', 9600, timeout=0)
+    except Exception as e:
+        feedback_arduino = None
+        print(f"Aviso: Painel de LEDs desconectado na porta COM4. Erro: {e}")
+        
+    led_active = False
+
     while cap.isOpened():
         success, frame = cap.read()
         if not success:
@@ -121,8 +138,18 @@ def main():
                     stroke_name = stroke_names[class_id]
                     
                     # Motor de Regras: Avaliar biomecânica neste momento específico
-                    feedback_str, angles_dict = rule_engine.evaluate_stroke(class_id, landmarks)
+                    feedback_str, angles_dict, failed_joints = rule_engine.evaluate_stroke(class_id, landmarks)
                     
+                    # Controle IoT
+                    if feedback_arduino is not None:
+                        if failed_joints:
+                            for joint in failed_joints:
+                                feedback_arduino.write(MAPA_LEDS[joint])
+                            led_active = True
+                        elif led_active:
+                            feedback_arduino.write(b'R')
+                            led_active = False
+
                     # Atualizar feedback para mostrar na tela
                     current_feedback = f"{stroke_name} ({confidence:.2f}): {feedback_str}"
                     feedback_time = time.time()

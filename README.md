@@ -1,118 +1,106 @@
-```sh
-Utilize o site <https://www.toptal.com/developers/gitignore> para gerar seu arquivo gitignore e apague este campo.
-
-Vide tutoriais do PI.
-```
-
 # FECAP - Fundação de Comércio Álvares Penteado
 
 <p align="center">
-<a href= "https://www.fecap.br/"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRhZPrRa89Kma0ZZogxm0pi-tCn_TLKeHGVxywp-LXAFGR3B1DPouAJYHgKZGV0XTEf4AE&usqp=CAU" alt="FECAP - Fundação de Comércio Álvares Penteado" border="0"></a>
+<a href="https://www.fecap.br/"><img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRhZPrRa89Kma0ZZogxm0pi-tCn_TLKeHGVxywp-LXAFGR3B1DPouAJYHgKZGV0XTEf4AE&usqp=CAU" alt="FECAP - Fundação de Comércio Álvares Penteado" border="0"></a>
 </p>
 
-# Nome do Projeto
+# TennisSync
 
-## Nome do Grupo
+## Equipe: TennisSync (Ciência da Computação - 6º Semestre)
 
-## Integrantes: <a href="https://www.linkedin.com/in/victorbarq/">Goku Sayajin</a>, <a href="https://www.linkedin.com/in/victorbarq/">Saitama One</a>, <a href="https://www.linkedin.com/in/victorbarq/">Ikki de Fenix</a>, <a href="https://www.linkedin.com/in/victorbarq/">Yusuke Urameshi</a>, <a href="https://www.linkedin.com/in/victorbarq/">Roronoa Zoro</a>
+### Integrantes:
+- Bernardo Seijas Cavalcante
+- Carlos Roberto Santos Latorre
+- Felipe Wakasa Klabunde
+- Stephany Aliyah Guimarães Eurípedes de Paula
 
-## Professores Orientadores: <a href="https://www.linkedin.com/in/victorbarq/">Dr. Victor Von Doom</a>, <a href="https://www.linkedin.com/in/victorbarq/">Me. Saitama</a>, <a href="https://www.linkedin.com/in/victorbarq/">Dr. Strange</a>, <a href="https://www.linkedin.com/in/victorbarq/">Me. Yoda</a>, <a href="https://www.linkedin.com/in/victorbarq/">Dr. Gero</a>
+---
 
-## Descrição
+## 📝 Descrição
 
-<p align="center">
-<img src="https://pix4free.org/assets/library/2021-01-20/originals/game.jpg" alt="NOME DO JOGO" border="0">
-  Game by <a href="http://www.nyphotographic.com/">Nick Youngson</a> <a rel="license" href="https://creativecommons.org/licenses/by-sa/3.0/">CC BY-SA 3.0</a> <a href="http://pix4free.org/">Pix4free</a>
-</p>
+O **TennisSync** é um sistema de análise biomecânica em tempo real e treinador interativo para jogadores de tênis. O projeto utiliza visão computacional, inteligência artificial e Internet das Coisas (IoT) para automatizar o diagnóstico postural durante os treinamentos.
 
+O sistema opera através de uma arquitetura modular de três camadas:
+1. **Camada de Extração:** Rastreamento do atleta via câmera com extração de 33 landmarks espaciais 3D (X, Y, Z) utilizando o MediaPipe Pose Landmarker, normalizados em relação ao centro do quadril.
+2. **Camada de Contexto:** Classificador temporal (Transformer) que processa janelas deslizantes de 60 frames para identificar a classe do golpe executado (*Forehand*, *Backhand*, *Saque* ou *Repouso*).
+3. **Camada de Diagnóstico:** Motor geométrico heurístico que valida os ângulos articulares através do cálculo do produto escalar de vetores 3D, comparando-os com limiares biomecânicos.
 
-De um a dois parágrafos sobre o que é seu projeto e o que ele faz.
-<br><br>
-Meu projeto ajuda estudantes FECAP a configurarem seus githubs.
-<br><br>
-May the force be with you!
-<br><br>
+O feedback multissensorial é emitido em tempo real:
+- **Visual (HUD):** Texto e esqueleto sobrepostos ao vídeo (OpenCV).
+- **Físico (IoT):** Painel de 12 LEDs no Arduino Uno mapeando as articulações com desvios posturais.
+- **Sonoro:** Buzzer no circuito e módulo de voz corretiva.
 
-## 🛠 Estrutura de pastas
+---
 
--Raiz<br>
-|<br>
-|-->documentos<br>
-  &emsp;|-->antigos<br>
-  &emsp;|Documentação.docx<br>
-|-->executáveis<br>
-  &emsp;|-->windows<br>
-  &emsp;|-->android<br>
-  &emsp;|-->HTML<br>
-|-->imagens<br>
-|-->src<br>
-  &emsp;|-->Backend<br>
-  &emsp;|-->Frontend<br>
-|readme.md<br>
+## 🛠 Estrutura de Pastas
 
-A pasta raiz contem dois arquivos que devem ser alterados:
-
-<b>README.MD</b>: Arquivo que serve como guia e explicação geral sobre seu projeto. O mesmo que você está lendo agora.
-
-Há também 4 pastas que seguem da seguinte forma:
-
-<b>documentos</b>: Toda a documentação estará nesta pasta.
-
-<b>executáveis</b>: Binários e executáveis do projeto devem estar nesta pasta.
-
-<b>imagens</b>: Imagens do sistema
-
-<b>src</b>: Pasta que contém o código fonte.
-
-## 🛠 Instalação
-
-<b>Android:</b>
-
-Faça o Download do JOGO.apk no seu celular.
-Execute o APK e siga as instruções de seu telefone.
-
-```sh
-Coloque código do prompt de comnando se for necessário
+```
+Projeto11/
+├── documentos/                         # Documentação acadêmica e técnica do projeto
+│   ├── Entrega 1/                      # Relatórios da Entrega 1 por disciplina
+│   │   ├── Inovação e Empreendedorismo/
+│   │   ├── Projeto Interdisciplinar - Internet das Coisas e Robótica/
+│   │   ├── Redes de Computadores e Cibersegurança/
+│   │   ├── Sistemas Embarcados e Robótica/
+│   │   └── Teoria da Computação e Linguagens Formais/
+│   ├── Entrega 2/                      # Documentação em desenvolvimento da Entrega 2
+│   ├── arquitetura_sistema.md          # Especificação da arquitetura híbrida de 3 camadas
+│   └── integracao_iot.md               # Especificação da integração serial com o Arduino
+├── imagens/                            # Recursos visuais e diagramas
+├── src/                                # Conteúdo físico do projeto (Códigos-fonte e Firmwares)
+│   ├── Entrega 1/                      # Versão final homologada da Entrega 1
+│   │   ├── Backend/                    # Pipeline de Visão Computacional, IA e Regras
+│   │   │   ├── models/                 # TennisTransformerGPU
+│   │   │   ├── angle_calculator.py     # Trigonometria 3D de ângulos articulares
+│   │   │   ├── pose_estimation.py      # Script principal do pipeline
+│   │   │   ├── rule_engine.py          # Validação biomecânica dos golpes
+│   │   │   ├── pose_landmarker_lite.task # Modelo MediaPipe
+│   │   │   └── requirements.txt
+│   │   ├── IoT/                        # Hardware e Firmware Embarcado
+│   │   │   └── firmware_leds/          # Código C++ (.ino) para Arduino Uno
+│   │   └── Frontend/                   # Interface visual (HUD OpenCV)
+│   └── Entrega 2/                      # Ambiente de desenvolvimento da Entrega 2
+│       ├── Backend/                    # Base de código para melhorias da Entrega 2
+│       ├── IoT/                        # Firmware para suporte a pedal e voz
+│       └── Frontend/                   # Estrutura para dashboard web
+├── .gitignore                          # Regras de exclusão do Git (Python, Node, OS)
+└── README.md                           # Guia geral do projeto
 ```
 
-<b>Windows:</b>
+---
 
-Não há instalação! Apenas executável!
-Encontre o JOGO.exe na pasta executáveis e execute-o como qualquer outro programa.
+## 💻 Instalação e Execução
 
-```sh
-Coloque código do prompt de comnando se for necessário
-```
+### Pré-requisitos
+- Python 3.10 ou superior
+- Webcam conectada
+- (Opcional) Arduino Uno com o firmware gravado na porta Serial `COM4`
 
-<b>HTML:</b>
+### Passos de Instalação
 
-Não há instalação!
-Encontre o index.html na pasta executáveis e execute-o como uma página WEB (através de algum browser).
+1. Clone o repositório:
+   ```bash
+   git clone https://github.com/fecaphub/Projeto11.git
+   ```
 
-## 💻 Configuração para Desenvolvimento
+2. Acesse o diretório do Backend:
+   ```bash
+   cd "src/Entrega 1/Backend"
+   ```
 
-Descreva como instalar todas as dependências para desenvolvimento e como rodar um test-suite automatizado de algum tipo. Se necessário, faça isso para múltiplas plataformas.
+3. Instale as dependências:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Para abrir este projeto você necessita das seguintes ferramentas:
+4. Execute o sistema:
+   ```bash
+   python pose_estimation.py
+   ```
 
--<a href="https://godotengine.org/download">GODOT</a>
+---
 
-```sh
-make install
-npm test
-Coloque código do prompt de comnando se for necessário
-```
+## ⚡ Simulação do Circuito IoT
 
-## 📋 Licença/License
-Utilize o link <https://chooser-beta.creativecommons.org/> para fazer uma licença CC BY 4.0.
-
-## 🎓 Referências
-
-Aqui estão as referências usadas no projeto.
-
-1. <https://github.com/iuricode/readme-template>
-2. <https://github.com/gabrieldejesus/readme-model>
-3. <https://chooser-beta.creativecommons.org/>
-4. <https://freesound.org/>
-5. <https://www.toptal.com/developers/gitignore>
-6. Músicas por: <a href="https://freesound.org/people/DaveJf/sounds/616544/"> DaveJf </a> e <a href="https://freesound.org/people/DRFX/sounds/338986/"> DRFX </a> ambas com Licença CC 0.
+- Plataforma Wokwi: [Circuito TennisSync no Wokwi](https://wokwi.com/projects/477109468016580609)
+- Firmware Arduino: `src/Entrega 1/IoT/firmware_leds/firmware_leds.ino`

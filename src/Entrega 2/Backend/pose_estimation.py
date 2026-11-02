@@ -7,7 +7,18 @@ from mediapipe.tasks.python.vision import drawing_utils
 from mediapipe.tasks.python.vision import drawing_styles
 import numpy as np
 import collections
-import serial
+try:
+    import serial
+    HAS_SERIAL = True
+except ImportError:
+    serial = None
+    HAS_SERIAL = False
+import os
+import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 MAPA_LEDS = {
     "ombro_esq": b'A', "ombro_dir": b'B', "cotovelo_esq": b'C', 
@@ -48,21 +59,30 @@ def process_landmarks_to_tensor(landmarks):
     return centered_coords
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Executa o pipeline TennisSync em tempo real (Webcam ou arquivo de vídeo).")
+    parser.add_argument("--source", type=str, default="0",
+                        help="Índice da câmera (ex: 0 ou 1) ou caminho para um arquivo de vídeo (.mp4).")
+    args = parser.parse_args()
+
+    device = 'cuda' if (HAS_TORCH and torch.cuda.is_available()) else 'cpu'
+
     # Inicializa o modelo de classificação de tênis
     tennis_model = TennisTransformerGPU()
     if HAS_TORCH:
-        tennis_model = tennis_model.to('cuda')
+        tennis_model = tennis_model.to(device)
     
     # Caminho para o modelo MediaPipe
-    model_path = 'pose_landmarker_lite.task'
+    model_path = os.path.join(BASE_DIR, 'pose_landmarker_lite.task')
     base_options = python.BaseOptions(model_asset_path=model_path)
     options = vision.PoseLandmarkerOptions(
         base_options=base_options,
         running_mode=vision.RunningMode.IMAGE)
     landmarker = vision.PoseLandmarker.create_from_options(options)
 
-    # Inicia a captura de vídeo
-    cap = cv2.VideoCapture(1)
+    # Inicia a captura de vídeo (aceita índice numérico de webcam ou caminho de arquivo .mp4)
+    video_source = int(args.source) if args.source.isdigit() else args.source
+    cap = cv2.VideoCapture(video_source)
 
     pTime = 0
     
@@ -125,7 +145,7 @@ def main():
                 input_data = np.expand_dims(input_data, axis=0)
                 
                 if HAS_TORCH:
-                    input_tensor = torch.tensor(input_data, dtype=torch.float32).to('cuda')
+                    input_tensor = torch.tensor(input_data, dtype=torch.float32).to(device)
                 else:
                     input_tensor = input_data
                     

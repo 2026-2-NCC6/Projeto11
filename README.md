@@ -8,14 +8,9 @@
 
 ## Equipe: TennisSync (Ciência da Computação - 6º Semestre)
 
-### Integrantes:
-- Bernardo Seijas Cavalcante
-- Carlos Roberto Santos Latorre
-- Felipe Wakasa Klabunde
-- Stephany Aliyah Guimarães Eurípedes de Paula
+## Integrantes: <a href="https://www.linkedin.com/in/bernardoseijascavalcante/">Bernardo Seijas Cavalcante</a>, <a href="https://github.com/carlinhoslatorre">Carlos Roberto Santos Latorre</a>, <a href="https://www.linkedin.com/in/felipe-wakasa-76a93a257/">Felipe Wakasa Klabunde</a>, <a href="https://www.linkedin.com/in/stephany-aliyah-4a2589321/">Stephany Aliyah Guimarães Eurípedes de Paula</a>
 
----
-
+## Professores Orientadores: <a href="https://www.linkedin.com/in/edsonbarbero/">Edson Ricardo Barbero</a>, <a href="https://www.linkedin.com/in/trencher/">João Francisco Trencher Martins</a>, <a href="https://www.linkedin.com/in/katia-bossi/">Kátia Milani Lara Bossi</a>, <a href="https://www.linkedin.com/in/professorrodnil/">Rodnil da Silva Moreira Lisboa</a>, <a href="https://www.linkedin.com/in/victorbarq/">Victor Bruno Alexander Rosetti de Quiroz</a>
 ## 📝 Descrição
 
 O **TennisSync** é um sistema de análise biomecânica em tempo real e treinador interativo para jogadores de tênis. O projeto utiliza visão computacional, inteligência artificial e Internet das Coisas (IoT) para automatizar o diagnóstico postural durante os treinamentos.

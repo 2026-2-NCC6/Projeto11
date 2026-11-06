@@ -40,7 +40,7 @@
 | **Trechos ou entregas afetadas** | Entrega 1 de Inovação e empreendedorismo   |
 
 
-### Disciplina 3
+### Projeto Interdisciplinar: Internet das Coisas e Robótica
 
 | **Aluno(s) Responsável(veis)** |[preencher] |
 | :--- | :--- |
@@ -113,7 +113,20 @@
 | ***Prompts* principais utilizados** | gerar slides |
 | **Trechos ou entregas afetadas** | Entrega 2 de Inovação e empreendedorismo |
 
-### Disciplina 3
+### Projeto Interdisciplinar: Internet das Coisas e Robótica
+
+| **Aluno(s) Responsável(veis)** |[preencher] |
+| :--- | :--- |
+| **Ferramenta utilizada** | [preencher] |
+| **Versão/modelo** | [preencher] |
+| **Disciplina / Trabalho** | [preencher] |
+| **Finalidade de uso** | [preencher] |
+| ***Prompts* principais utilizados** | [preencher] |
+| **Trechos ou entregas afetadas** | [preencher] |
+
+
+
+### Sistemas Embarcados e Robótica
 
 | **Aluno(s) Responsável(veis)** |[preencher] |
 | :--- | :--- |

@@ -54,11 +54,11 @@
 | **Aluno(s) Responsável(veis)** | Stephany Aliyah Guimarães Eurípedes de Paula |
 | :--- | :--- |
 | **Ferramenta utilizada** | ChatGPT (OpenAI) |
-| **Versão/modelo** | GPT-6|
+| **Versão/modelo** | GPT-6 (modelo atual; versão utilizada originalmente não confirmada) |
 | **Disciplina / Trabalho** | Teoria da Computação e Linguagens Formais |
-| **Finalidade de uso** | Auxílio na compreensão dos estados, eventos, transições e revisão dos conceitos técnicos.|
-| ***Prompts* principais utilizados** | Exemplos reconstruídos: "Pode me explicar o que é uma máquina de estados e como ela funciona?"; "Qual é a diferença entre estados, eventos e transições?"; "Como identificar os estados necessários para representar o funcionamento do sistema?"; "Pode me explicar como verificar se as transições entre os estados estão corretas?"; "Pode verificar se as informações estão de acordo com os requisitos da Entrega 1?" |
-| **Trechos ou entregas afetadas** | Revisão conceitual dos estados, compreensão dos eventos e transições, verificação das regras de funcionamento e conferência dos requisitos da Entrega. |
+| **Finalidade de uso** | Auxílio na compreensão dos estados, eventos, transições e revisão dos conceitos técnicos. |
+| ***Prompts* principais utilizados** | "Pode me explicar o que é uma máquina de estados e como ela funciona?"; "Qual é a diferença entre estados, eventos e transições?"; "Como identificar os estados necessários para representar o funcionamento do sistema?"; "Pode me explicar como verificar se as transições entre os estados estão corretas?"; "Pode verificar se as informações estão de acordo com os requisitos da Entrega 1?" |
+| **Trechos ou entregas afetadas** | Revisão conceitual dos estados, compreensão dos eventos e transições, verificação das regras de funcionamento, revisão textual do relatório e conferência dos requisitos da Entrega 1. |
 
 
 ## Entrega 2
@@ -106,7 +106,7 @@
 | **Versão/modelo** | GPT-6|
 | **Disciplina / Trabalho** | Teoria da Computação e Linguagens Formais|
 | **Finalidade de uso** | Auxílio na compreensão de autômatos, regras de funcionamento, decidibilidade e revisão técnica. |
-| ***Prompts* principais utilizados** | Exemplos reconstruídos: "Pode me explicar a definição formal de um autômato finito e o significado de cada elemento?"; "Como funciona a relação entre eventos e transições em uma máquina de estados?"; "Qual é a diferença entre pré-condições e pós-condições?"; "Pode explicar a diferença entre autômatos finitos, autômatos com pilha e máquinas de Turing?"; "Como funciona a análise de decidibilidade aplicada ao sistema?"; "Pode verificar se o conteúdo está correto e atende aos requisitos da Entrega 2?" |
+| ***Prompts* principais utilizados** | "Pode me explicar a definição formal de um autômato finito e o significado de cada elemento?"; "Como funciona a relação entre eventos e transições em uma máquina de estados?"; "Qual é a diferença entre pré-condições e pós-condições?"; "Pode explicar a diferença entre autômatos finitos, autômatos com pilha e máquinas de Turing?"; "Como funciona a análise de decidibilidade aplicada ao sistema?"; "Pode verificar se o conteúdo está correto e atende aos requisitos da Entrega 2?" |
 | **Trechos ou entregas afetadas** | Revisão da definição formal do autômato, verificação das relações entre eventos e transições, compreensão das regras do sistema, análise das pré-condições e pós-condições, estudo dos modelos computacionais, análise de decidibilidade e conferência dos requisitos da Entrega 2. |
 
 

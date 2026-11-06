@@ -16,16 +16,29 @@
 | **Trechos ou entregas afetadas** | Gerou um plano de gerenciamento de riscos e relatório de vulnerabilidades, mas como gerou muitas informações, acabei intervindo manualmente em alguns trechos para que fique de acordo com o que foi pedido |
 
 
-### Disciplina 2
+### Inovação e empreendedorismo 
 
-| **Aluno(s) Responsável(veis)** |[preencher] |
+| **Aluno(s) Responsável(veis)** |Felipe Wakasa Klabunde |
 | :--- | :--- |
-| **Ferramenta utilizada** | [preencher] |
-| **Versão/modelo** | [preencher] |
-| **Disciplina / Trabalho** | [preencher] |
-| **Finalidade de uso** | [preencher] |
-| ***Prompts* principais utilizados** | [preencher] |
-| **Trechos ou entregas afetadas** | [preencher] |
+| **Ferramenta utilizada** | GPT |
+| **Versão/modelo** | GPT-6 |
+| **Disciplina / Trabalho** |Inovação e empreendedorismo |
+| **Finalidade de uso** | Pesquisa de dados |
+| ***Prompts* principais utilizados** | *Texto da entrega 1* com base no que está sendo pedido , pesquise sobre concorrentes e potenciais jogadores de tennis no brasil, depois estruturar os slides de um jeito coerente e didático. |
+| **Trechos ou entregas afetadas** | Entrega 1 de Inovação e empreendedorismo  |
+
+
+### Inovação e empreendedorismo
+
+| **Aluno(s) Responsável(veis)** |Felipe Wakasa Klabunde |
+| :--- | :--- |
+| **Ferramenta utilizada** |NotebookLM |
+| **Versão/modelo** | Gemini 3.5 |
+| **Disciplina / Trabalho** | Inovação e empreendedorismo |
+| **Finalidade de uso** | Gerar slides didáticos a partir dos dados já levantados |
+| ***Prompts* principais utilizados** | gerar slides |
+| **Trechos ou entregas afetadas** | Entrega 1 de Inovação e empreendedorismo   |
+
 
 ### Disciplina 3
 
@@ -53,16 +66,28 @@
 | **Trechos ou entregas afetadas** | Muitas informações que acabaram exigindo uma intervenção manual na estrutura do relatório |
 
 
-### Disciplina 2
+### Inovação e empreendedorismo 
 
-| **Aluno(s) Responsável(veis)** |[preencher] |
+| **Aluno(s) Responsável(veis)** |Felipe Wakasa Klabunde |
 | :--- | :--- |
-| **Ferramenta utilizada** | [preencher] |
-| **Versão/modelo** | [preencher] |
-| **Disciplina / Trabalho** | [preencher] |
-| **Finalidade de uso** | [preencher] |
-| ***Prompts* principais utilizados** | [preencher] |
-| **Trechos ou entregas afetadas** | [preencher] |
+| **Ferramenta utilizada** | GPT |
+| **Versão/modelo** | GPT-6 |
+| **Disciplina / Trabalho** |Inovação e empreendedorismo |
+| **Finalidade de uso** | Pesquisa de dados |
+| ***Prompts* principais utilizados** | *Texto da entrega 2* com base no que está sendo pedido , revise os numeros de jogadores e da parte financeira do projeto, revise bem as 5 forças de potter, e estruture os slides.  |
+| **Trechos ou entregas afetadas** | Entrega 2 de Inovação e empreendedorismo  |
+
+
+### Inovação e empreendedorismo
+
+| **Aluno(s) Responsável(veis)** |Felipe Wakasa Klabunde |
+| :--- | :--- |
+| **Ferramenta utilizada** |NotebookLM |
+| **Versão/modelo** | Gemini 3.5 |
+| **Disciplina / Trabalho** | Inovação e empreendedorismo |
+| **Finalidade de uso** | Gerar slides didáticos a partir dos dados revisados da entrega 2 |
+| ***Prompts* principais utilizados** | gerar slides |
+| **Trechos ou entregas afetadas** | Entrega 2 de Inovação e empreendedorismo |
 
 ### Disciplina 3
 

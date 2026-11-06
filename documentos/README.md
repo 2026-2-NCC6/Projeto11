@@ -124,6 +124,18 @@
 | ***Prompts* principais utilizados** | [preencher] |
 | **Trechos ou entregas afetadas** | [preencher] |
 
+### Teoria da Computação e Linguagens Formais
+
+| **Aluno(s) Responsável(veis)** | Stephany Aliyah Guimarães Eurípedes de Paula |
+| :--- | :--- |
+| **Ferramenta utilizada** | ChatGPT (OpenAI) |
+| **Versão/modelo** | GPT-6|
+| **Disciplina / Trabalho** | Teoria da Computação e Linguagens Formais|
+| **Finalidade de uso** | Auxílio na compreensão de autômatos, regras de funcionamento, decidibilidade e revisão técnica. |
+| ***Prompts* principais utilizados** | "Pode me explicar a definição formal de um autômato finito e o significado de cada elemento?"; "Como funciona a relação entre eventos e transições em uma máquina de estados?"; "Qual é a diferença entre pré-condições e pós-condições?"; "Pode explicar a diferença entre autômatos finitos, autômatos com pilha e máquinas de Turing?"; "Como funciona a análise de decidibilidade aplicada ao sistema?"; "Pode verificar se o conteúdo está correto e atende aos requisitos da Entrega 2?" |
+| **Trechos ou entregas afetadas** | Revisão da definição formal do autômato, verificação das relações entre eventos e transições, compreensão das regras do sistema, análise das pré-condições e pós-condições, estudo dos modelos computacionais, análise de decidibilidade e conferência dos requisitos da Entrega 2. |
+
+
 ***Declaro que o uso acima descrito está em conformidade com o GUIA PARA O USO RESPONSÁVEL DE
 INTELIGÊNCIA ARTIFICIAL NA FECAP e que o conteúdo final é de minha plena responsabilidade
 autoral.***

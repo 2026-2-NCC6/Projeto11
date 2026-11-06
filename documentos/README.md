@@ -51,6 +51,30 @@
 | ***Prompts* principais utilizados** | [preencher] |
 | **Trechos ou entregas afetadas** | [preencher] |
 
+
+### Sistemas Embarcados e Robótica
+
+| **Aluno(s) Responsável(veis)** | Stephany Aliyah Guimarães Eurípedes de Paula |
+| :--- | :--- |
+| **Ferramenta utilizada** | ChatGPT (OpenAI) |
+| **Versão/modelo** | GPT-6 |
+| **Disciplina / Trabalho** | Sistemas Embarcados e Robótica|
+| **Finalidade de uso** | A Auxílio na compreensão técnica, análise de medições elétricas e revisão do relatório. |
+| ***Prompts* principais utilizados** |  "Pode me explicar o funcionamento dos LEDs e resistores no circuito com Arduino?"; "Pode explicar o código utilizado e a função de cada parte?"; "Pode me ajudar a entender os cálculos e as medições de tensão e corrente?"; "Pode explicar como funciona a comunicação serial do Arduino?"; "Pode revisar as explicações técnicas do relatório e melhorar a escrita?" |
+| **Trechos ou entregas afetadas** | Explicações técnicas dos circuitos, descrição do funcionamento dos componentes eletrônicos, interpretação do código Arduino, análise das medições elétricas e revisão textual do relatório da Entrega 1. |
+
+### Teoria da Computação e Linguagens Formais
+
+| **Aluno(s) Responsável(veis)** | Stephany Aliyah Guimarães Eurípedes de Paula |
+| :--- | :--- |
+| **Ferramenta utilizada** | ChatGPT (OpenAI) |
+| **Versão/modelo** | GPT-6 |
+| **Disciplina / Trabalho** | Teoria da Computação e Linguagens Formais |
+| **Finalidade de uso** | Auxílio na compreensão dos estados, eventos, transições e revisão dos conceitos técnicos. |
+| ***Prompts* principais utilizados** | "Pode me explicar o que é uma máquina de estados e como ela funciona?"; "Qual é a diferença entre estados, eventos e transições?"; "Como identificar os estados necessários para representar o funcionamento do sistema?"; "Pode me explicar como verificar se as transições entre os estados estão corretas?"; "Pode verificar se as informações estão de acordo com os requisitos da Entrega 1?" |
+| **Trechos ou entregas afetadas** | Revisão conceitual dos estados, compreensão dos eventos e transições, verificação das regras de funcionamento, revisão textual do relatório e conferência dos requisitos da Entrega 1. |
+
+
 ## Entrega 2
 <br><br>
 

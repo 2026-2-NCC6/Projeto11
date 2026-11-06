@@ -54,7 +54,7 @@
 | **Aluno(s) Responsável(veis)** | Stephany Aliyah Guimarães Eurípedes de Paula |
 | :--- | :--- |
 | **Ferramenta utilizada** | ChatGPT (OpenAI) |
-| **Versão/modelo** | GPT-6 (modelo atual; versão utilizada originalmente não confirmada) |
+| **Versão/modelo** | GPT-6|
 | **Disciplina / Trabalho** | Teoria da Computação e Linguagens Formais |
 | **Finalidade de uso** | Auxílio na compreensão dos estados, eventos, transições e revisão dos conceitos técnicos. |
 | ***Prompts* principais utilizados** | "Pode me explicar o que é uma máquina de estados e como ela funciona?"; "Qual é a diferença entre estados, eventos e transições?"; "Como identificar os estados necessários para representar o funcionamento do sistema?"; "Pode me explicar como verificar se as transições entre os estados estão corretas?"; "Pode verificar se as informações estão de acordo com os requisitos da Entrega 1?" |

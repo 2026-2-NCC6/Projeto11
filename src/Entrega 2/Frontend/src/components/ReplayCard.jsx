@@ -5,21 +5,27 @@ export function ReplayCard({ latestReplayUrl, telemetry = {} }) {
   const videoRef = useRef(null);
   const [playbackRate, setPlaybackRate] = useState(1.0);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [hasError, setHasError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Quando chegar uma nova URL de replay, reinicia o player automaticamente
   useEffect(() => {
+    setHasError(false);
     if (videoRef.current && latestReplayUrl) {
-      videoRef.current.load();
       videoRef.current.playbackRate = playbackRate;
-      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch((err) => {
+        console.warn("[ReplayCard] Autoplay bloqueado pelo navegador:", err);
+        setIsPlaying(false);
+      });
     }
-  }, [latestReplayUrl]);
+  }, [latestReplayUrl, reloadKey]);
 
   const handleTogglePlay = () => {
     if (!videoRef.current) return;
     if (videoRef.current.paused) {
-      videoRef.current.play();
-      setIsPlaying(true);
+      videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
     } else {
       videoRef.current.pause();
       setIsPlaying(false);
@@ -29,8 +35,12 @@ export function ReplayCard({ latestReplayUrl, telemetry = {} }) {
   const handleRestart = () => {
     if (!videoRef.current) return;
     videoRef.current.currentTime = 0;
-    videoRef.current.play();
-    setIsPlaying(true);
+    videoRef.current.play().then(() => setIsPlaying(true)).catch(() => {});
+  };
+
+  const handleRetry = () => {
+    setHasError(false);
+    setReloadKey(k => k + 1);
   };
 
   const handleSpeedChange = (speed) => {
@@ -87,18 +97,40 @@ export function ReplayCard({ latestReplayUrl, telemetry = {} }) {
             background: '#020617',
             borderRadius: '10px',
             overflow: 'hidden',
-            border: '1px solid rgba(255, 255, 255, 0.1)'
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
           }}>
-            <video
-              ref={videoRef}
-              src={latestReplayUrl}
-              autoPlay
-              loop
-              playsInline
-              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
-            />
+            {hasError ? (
+              <div style={{ textAlign: 'center', padding: '16px', color: '#f87171' }}>
+                <AlertTriangle size={32} style={{ margin: '0 auto 8px auto', display: 'block' }} />
+                <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
+                  Não foi possível reproduzir este clipe no navegador
+                </span>
+                <button onClick={handleRetry} className="btn btn-secondary" style={{ fontSize: '0.75rem', padding: '4px 10px' }}>
+                  <RotateCcw size={12} /> Recarregar Clipe
+                </button>
+              </div>
+            ) : (
+              <video
+                key={`${latestReplayUrl}_${reloadKey}`}
+                ref={videoRef}
+                src={latestReplayUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onError={(e) => {
+                  console.error("[ReplayCard] Erro no player de vídeo:", e);
+                  setHasError(true);
+                }}
+              />
+            )}
           </div>
 
           {/* Controles de Reprodução e Câmera Lenta */}

@@ -27,7 +27,7 @@ export function VideoFeed({
   telemetry,
   onTelemetryUpdate
 }) {
-  const [useLocalCamera, setUseLocalCamera] = useState(true);
+  const [useLocalCamera, setUseLocalCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [streamError, setStreamError] = useState(null);
 

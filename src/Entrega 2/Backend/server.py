@@ -41,6 +41,15 @@ class ServerState:
         self.engine = None
         self.cap = None
         self.last_client_frame_time = 0.0
+
+        replays_dir = os.path.join(BASE_DIR, "replays")
+        init_replay_url = None
+        init_replay_filename = None
+        latest_mp4 = os.path.join(replays_dir, "replay_latest.mp4")
+        if os.path.exists(latest_mp4) and os.path.getsize(latest_mp4) > 1000:
+            init_replay_url = f"/api/replay/latest?t={int(os.path.getmtime(latest_mp4)*1000)}"
+            init_replay_filename = "replay_latest.mp4"
+
         self.latest_telemetry = {
             "fps": 30.0,
             "stroke_id": 3,
@@ -55,8 +64,8 @@ class ServerState:
             "athlete_detected": False,
             "is_dark": False,
             "event_id": 0,
-            "latest_replay_url": None,
-            "latest_replay_filename": None,
+            "latest_replay_url": init_replay_url,
+            "latest_replay_filename": init_replay_filename,
             "landmarks": None,
             "game": {
                 "mode": "RALLY",
@@ -210,6 +219,11 @@ def get_status():
         "latest_telemetry": state.latest_telemetry
     }
 
+@app.get("/api/telemetry")
+def get_telemetry():
+    """Retorna o snapshot mais recente da telemetria e estado do jogo."""
+    return state.latest_telemetry
+
 @app.post("/api/settings")
 def update_settings(payload: SettingsPayload):
     state.lateralidade = payload.lateralidade
@@ -231,23 +245,37 @@ def reset_session():
     state.latest_telemetry["led_active"] = False
     return {"status": "ok", "message": "Sessão reiniciada com sucesso"}
 
-@app.get("/api/replay/latest")
+@app.api_route("/api/replay/latest", methods=["GET", "HEAD"])
 def get_latest_replay():
     """Retorna o vídeo .mp4 dos 5 segundos do último golpe com sobreposição MediaPipe."""
     replays_dir = os.path.join(BASE_DIR, "replays")
     latest_path = os.path.join(replays_dir, "replay_latest.mp4")
     if os.path.exists(latest_path) and os.path.getsize(latest_path) > 1000:
-        return FileResponse(latest_path, media_type="video/mp4")
+        return FileResponse(
+            latest_path,
+            media_type="video/mp4",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Accept-Ranges": "bytes"
+            }
+        )
     return JSONResponse({"error": "Nenhum replay gravado ainda"}, status_code=404)
 
-@app.get("/api/replays/{filename}")
+@app.api_route("/api/replays/{filename}", methods=["GET", "HEAD"])
 def get_replay_file(filename: str):
     """Retorna um clipe de replay específico salvo na pasta de replays."""
     replays_dir = os.path.join(BASE_DIR, "replays")
     safe_name = os.path.basename(filename)
     file_path = os.path.join(replays_dir, safe_name)
     if os.path.exists(file_path):
-        return FileResponse(file_path, media_type="video/mp4")
+        return FileResponse(
+            file_path,
+            media_type="video/mp4",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Accept-Ranges": "bytes"
+            }
+        )
     return JSONResponse({"error": "Replay não encontrado"}, status_code=404)
 
 def mjpeg_generator():

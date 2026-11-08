@@ -44,6 +44,16 @@ class TennisPoseDataset(Dataset):
             noise = np.random.normal(0.0, 0.008, size=sample.shape).astype(np.float32)
             sample = sample + noise
 
+            # Jitter adversarial nas maos (falanges 17 a 22):
+            hand_noise = np.random.normal(0.0, 0.05, size=(60, 6, 3)).astype(np.float32)
+            sample[:, [17, 18, 19, 20, 21, 22], :] += hand_noise
+
+            # 4. Leg Dropout / Masking (Invariância Total de Membros Inferiores):
+            # Em 50% dos batches, zera pernas/quadris (landmarks 23 a 32)
+            # Força o Transformer a aprender a cinemática de golpes exclusivamente pelo trem superior
+            if np.random.rand() < 0.50:
+                sample[:, 23:, :] = 0.0
+
         return torch.tensor(sample, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
 
 
@@ -128,7 +138,7 @@ def main():
     class_weights = torch.tensor(len(y_train) / (4.0 * class_counts), dtype=torch.float32, device=device)
 
     model = TennisTransformerNet(num_classes=4).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
+    criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 

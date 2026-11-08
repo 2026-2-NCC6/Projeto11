@@ -60,17 +60,50 @@ MAPA_LEDS = {
 
 def process_landmarks_to_tensor(landmarks):
     """
-    Recebe os 33 landmarks e os centraliza com base no quadril.
-    Retorna um array (33, 3).
+    Recebe os 33 landmarks do MediaPipe e aplica:
+    1. Centro anatômico estável (quadril ou ombros com fallback).
+    2. Normalização de escala proporcional à largura dos ombros (invariância à distância da câmera).
+    3. Estabilização e damping dos pontos instáveis da mão (dedos 17 a 22 presos ao pulso).
+    Retorna array (33, 3) invariantemente escalonado e livre de ruído de falanges.
     """
     if not HAS_NUMPY:
         return None
     coords = np.array([get_landmark_coord(lm) for lm in landmarks], dtype=np.float32)
+
+    shoulder_left = coords[11]
+    shoulder_right = coords[12]
     hip_left = coords[23]
     hip_right = coords[24]
-    hip_center = (hip_left + hip_right) / 2.0
-    centered_coords = coords - hip_center
-    return centered_coords
+
+    # Centro de referência: quadril se estiver visível e dentro do quadro; ombros caso contrário
+    hips_in_frame = (hip_left[1] <= 1.05 and hip_right[1] <= 1.05)
+    
+    # Distância 3D Euclidiana dos ombros (invariante a rotações de tronco em torno do eixo Y):
+    shoulder_dist_3d = float(np.linalg.norm(shoulder_left - shoulder_right))
+    if shoulder_dist_3d < 0.02:
+        shoulder_dist_3d = 0.20 # fallback de segurança
+
+    # Centro anatômico universal estável: esterno/manúbrio (média dos ombros)
+    center = (shoulder_left + shoulder_right) / 2.0
+
+    centered = coords - center
+
+    # Invariância de escala: fixa a métrica corporal em 0.40 unidades normalizadas
+    scale_factor = 0.40 / max(0.04, shoulder_dist_3d)
+    centered = centered * scale_factor
+
+    # Estabilização dos pontos instáveis da mão (falanges 17 a 22):
+    # O MediaPipe Pose Lite não possui modelo de falanges e os dedos tremem/oscilam no ar.
+    # Travamos a distância máxima dos dedos em 0.15 unidades em torno do pulso correspondente.
+    for wrist_idx, finger_indices in [(15, [17, 19, 21]), (16, [18, 20, 22])]:
+        wrist_pos = centered[wrist_idx]
+        for f_idx in finger_indices:
+            diff = centered[f_idx] - wrist_pos
+            dist = float(np.linalg.norm(diff))
+            if dist > 0.15:
+                centered[f_idx] = wrist_pos + (diff / dist) * 0.15
+
+    return centered
 
 def is_valid_human_pose(landmarks) -> bool:
     """
@@ -97,6 +130,40 @@ def is_valid_human_pose(landmarks) -> bool:
     return valid_count >= 2
 
 
+def create_compatible_videowriter(output_path, fps, width, height):
+    """
+    Cria um cv2.VideoWriter compatível com navegadores web modernos (H.264).
+    Tenta na seguinte ordem:
+      1. OpenH264 (tag 'avc1')
+      2. Windows Media Foundation H.264 (cv2.CAP_MSMF com tag 'H264')
+      3. Fallback mp4v
+    """
+    if not HAS_CV2:
+        return None
+
+    # 1. Tenta OpenH264 (avc1)
+    try:
+        writer = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'avc1'), fps, (width, height))
+        if writer is not None and writer.isOpened():
+            return writer
+    except Exception:
+        pass
+
+    # 2. Tenta Windows Media Foundation H.264 (cv2.CAP_MSMF)
+    try:
+        writer = cv2.VideoWriter(output_path, cv2.CAP_MSMF, cv2.VideoWriter_fourcc(*'H264'), fps, (width, height))
+        if writer is not None and writer.isOpened():
+            return writer
+    except Exception:
+        pass
+
+    # 3. Fallback mp4v
+    try:
+        return cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+    except Exception:
+        return None
+
+
 class TennisSyncEngine:
     """
     Motor desacoplado de Processamento Biomecânico, Visão Computacional e Replay.
@@ -119,23 +186,26 @@ class TennisSyncEngine:
         # Inicializa o detector MediaPipe
         self.landmarker = None
         if HAS_MEDIAPIPE:
-            model_path = os.path.join(BASE_DIR, 'pose_landmarker_lite.task')
+            # Prefere o modelo Full para corpo inteiro e rastreamento robusto a distância
+            full_model = os.path.join(BASE_DIR, 'pose_landmarker_full.task')
+            lite_model = os.path.join(BASE_DIR, 'pose_landmarker_lite.task')
+            model_path = full_model if os.path.exists(full_model) else lite_model
             if os.path.exists(model_path):
                 try:
                     base_options = python.BaseOptions(model_asset_path=model_path)
                     options = vision.PoseLandmarkerOptions(
                         base_options=base_options,
                         running_mode=vision.RunningMode.IMAGE,
-                        min_pose_detection_confidence=0.45,
-                        min_pose_presence_confidence=0.45,
-                        min_tracking_confidence=0.45
+                        min_pose_detection_confidence=0.40,
+                        min_pose_presence_confidence=0.40,
+                        min_tracking_confidence=0.40
                     )
                     self.landmarker = vision.PoseLandmarker.create_from_options(options)
                 except Exception as e:
                     print(f"[TenniSync Backend] Erro ao carregar MediaPipe: {e}")
 
-        # Buffer temporal de 60 frames para a rede Transformer
-        self.frame_buffer = collections.deque(maxlen=60)
+        # Buffer temporal de frames para a rede Transformer (suporta até 120 frames a 60 FPS)
+        self.frame_buffer = collections.deque(maxlen=120)
 
         # Buffer circular de Replay: 5 segundos de frames a 30 FPS = 150 frames em memória
         self.replay_buffer = collections.deque(maxlen=150)
@@ -143,6 +213,11 @@ class TennisSyncEngine:
         os.makedirs(self.replays_dir, exist_ok=True)
         self.latest_replay_filename = None
         self.latest_replay_url = None
+
+        latest_mp4 = os.path.join(self.replays_dir, "replay_latest.mp4")
+        if os.path.exists(latest_mp4) and os.path.getsize(latest_mp4) > 1000:
+            self.latest_replay_filename = "replay_latest.mp4"
+            self.latest_replay_url = f"/api/replay/latest?t={int(os.path.getmtime(latest_mp4)*1000)}"
 
         # Arduino Serial para hardware IoT
         self.feedback_arduino = None
@@ -190,7 +265,7 @@ class TennisSyncEngine:
     def _save_replay_clip(self, stroke_name: str, event_id: int):
         """
         Salva os frames dos últimos 5 segundos do buffer de replay
-        em um arquivo de vídeo .mp4 na pasta replays.
+        em um arquivo de vídeo .mp4 na pasta replays em formato compatível com navegadores (H.264).
         """
         if not HAS_CV2 or len(self.replay_buffer) < 15:
             return
@@ -204,21 +279,23 @@ class TennisSyncEngine:
         unique_path = os.path.join(self.replays_dir, unique_name)
         latest_path = os.path.join(self.replays_dir, "replay_latest.mp4")
 
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-
         try:
-            out = cv2.VideoWriter(unique_path, fourcc, fps_out, (w, h))
-            for f in frames_snapshot:
-                out.write(f)
-            out.release()
+            out = create_compatible_videowriter(unique_path, fps_out, w, h)
+            if out is not None and out.isOpened():
+                for f in frames_snapshot:
+                    out.write(f)
+                out.release()
+            else:
+                print(f"[TenniSync Replay] Erro: Não foi possível inicializar VideoWriter para {unique_path}", flush=True)
+                return
 
-            if os.path.exists(unique_path):
+            if os.path.exists(unique_path) and os.path.getsize(unique_path) > 1000:
                 import shutil
                 shutil.copyfile(unique_path, latest_path)
 
             self.latest_replay_filename = unique_name
             self.latest_replay_url = f"/api/replay/latest?t={int(time.time()*1000)}"
-            print(f"[TenniSync Replay] Gravado clipe de 5s ({len(frames_snapshot)} frames): {unique_name}", flush=True)
+            print(f"[TenniSync Replay] Gravado clipe de 5s ({len(frames_snapshot)} frames em H.264): {unique_name}", flush=True)
         except Exception as e:
             print(f"[TenniSync Replay] Erro ao salvar vídeo de replay: {e}", flush=True)
 
@@ -308,18 +385,29 @@ class TennisSyncEngine:
             # Salva o frame anotado no buffer circular de 5 segundos (150 frames máx)
             self.replay_buffer.append(annotated_frame)
 
-            # Centraliza landmarks pelo quadril e alimenta o buffer temporal
+            # Normaliza coordenadas e alimenta o buffer temporal com timestamp
             centered_coords = process_landmarks_to_tensor(landmarks)
-            self.frame_buffer.append(centered_coords)
+            self.frame_buffer.append((c_time, centered_coords))
+
+            # Mantém apenas os frames dos últimos 2.2 segundos
+            while len(self.frame_buffer) > 0 and (c_time - self.frame_buffer[0][0]) > 2.2:
+                self.frame_buffer.popleft()
 
             # ---------------------------------------------------------
-            # 3. Inferência do Modelo Transformer com Cooldown e Janela de 60 Frames
+            # 3. Inferência com Reamostragem Temporal Invariante ao FPS
             # ---------------------------------------------------------
-            if len(self.frame_buffer) == 60:
+            # Janela física de ~0.9s a 2.2s com pelo menos 10 frames
+            time_span = (self.frame_buffer[-1][0] - self.frame_buffer[0][0]) if len(self.frame_buffer) > 1 else 0.0
+            if len(self.frame_buffer) >= 10 and time_span >= 0.9:
                 # Só executa nova classificação se já passou o tempo de cooldown
                 if c_time >= self.stroke_cooldown_until:
-                    input_data = np.stack(self.frame_buffer)
-                    input_data = np.expand_dims(input_data, axis=0)
+                    times = np.array([item[0] for item in self.frame_buffer])
+                    raw_seq = np.stack([item[1] for item in self.frame_buffer])
+                    target_times = np.linspace(times[0], times[-1], 60)
+                    input_data = np.zeros((1, 60, 33, 3), dtype=np.float32)
+                    for lm in range(33):
+                        for c in range(3):
+                            input_data[0, :, lm, c] = np.interp(target_times, times, raw_seq[:, lm, c])
 
                     if HAS_TORCH:
                         input_tensor = torch.tensor(input_data, dtype=torch.float32).to(self.device)
@@ -328,16 +416,21 @@ class TennisSyncEngine:
 
                     class_id, confidence = self.tennis_model(input_tensor)
 
-                    # Gate cinemático calibrado: detecta tanto golpes amadores/compactos quanto profissionais,
-                    # mantendo bloqueio absoluto a posturas de repouso estático (que possuem motion < 0.010).
-                    buffer_arr = np.stack(self.frame_buffer)
-                    wrist_motion = float((np.std(buffer_arr[:, 15, :]) + np.std(buffer_arr[:, 16, :])) / 2.0)
-                    wrist_disp = float(np.ptp(buffer_arr[:, 15, :], axis=0).max() + np.ptp(buffer_arr[:, 16, :], axis=0).max())
-                    elbow_motion = float((np.std(buffer_arr[:, 13, :]) + np.std(buffer_arr[:, 14, :])) / 2.0)
-                    is_kinematically_active = (wrist_motion >= 0.020 and wrist_disp >= 0.08) or elbow_motion >= 0.018
+                    # Gate cinemático calibrado: detecta golpes tanto a 3.5m (fundo) quanto a 1.5m (cintura para cima)
+                    # com portão unilateral (máximo entre os pulsos) e dinamismo do tronco/ombros
+                    buffer_arr = input_data[0]
+                    wrist_motion_max = max(float(np.std(buffer_arr[:, 15, :2], axis=0).mean()),
+                                           float(np.std(buffer_arr[:, 16, :2], axis=0).mean()))
+                    wrist_disp_max = float(max(np.ptp(buffer_arr[:, 15, :2], axis=0).max(),
+                                               np.ptp(buffer_arr[:, 16, :2], axis=0).max()))
+                    torso_motion = float((np.std(buffer_arr[:, 11, :2], axis=0).mean() + 
+                                          np.std(buffer_arr[:, 12, :2], axis=0).mean()) / 2.0)
+                    
+                    # Calibração cinemática temporal unilateral:
+                    is_kinematically_active = (wrist_motion_max >= 0.038 and wrist_disp_max >= 0.20) or                                               (torso_motion >= 0.024 and wrist_disp_max >= 0.17)
 
                     # Se for golpe ativo (0=Forehand, 1=Backhand, 2=Saque) com confiança calibrada E movimento dinâmico real
-                    if class_id in [0, 1, 2] and confidence >= 0.70 and is_kinematically_active:
+                    if class_id in [0, 1, 2] and confidence >= 0.75 and is_kinematically_active:
                         stroke_names = {0: "Forehand", 1: "Backhand", 2: "Saque"}
                         self.current_stroke_id = int(class_id)
                         self.current_stroke_name = stroke_names[class_id]
@@ -346,7 +439,7 @@ class TennisSyncEngine:
 
                         # Fica visível na tela por 3.5 segundos sem piscar
                         self.stroke_display_until = c_time + 3.5
-                        # Bloqueia novos disparos pelos próximos 2.5 segundos
+                        # Bloqueia novos disparos pelos próximos 2.0 segundos
                         self.stroke_cooldown_until = c_time + 2.5
 
                         # Avaliação biomecânica do golpe detectado
@@ -382,16 +475,15 @@ class TennisSyncEngine:
                                 self.feedback_arduino.write(b'R')
                                 self.led_active = False
 
-                        # Limpa parcialmente o buffer para não redisparar imediatamente
-                        for _ in range(30):
-                            if len(self.frame_buffer) > 0:
-                                self.frame_buffer.popleft()
+                        # Limpa o buffer para não redisparar imediatamente no follow-through
+                        self.frame_buffer.clear()
 
         else:
             # Nenhuma pessoa válida detectada no frame
             self.current_landmarks = None
             self.no_pose_consecutive += 1
-            if self.no_pose_consecutive >= 5:
+            # Tolerância estendida para 10 frames (~0.5s) para absorver oclusões rápidas em corpo inteiro
+            if self.no_pose_consecutive >= 10:
                 self.athlete_detected = False
                 self.frame_buffer.clear()
 

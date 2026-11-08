@@ -61,7 +61,7 @@ export function useTennisSync() {
       sessionActiveRef.current &&
       data.stroke_id >= 0 &&
       data.stroke_id <= 2 &&
-      data.confidence > 0.80
+      data.confidence >= 0.60
     ) {
       const eventId = data.event_id;
       const now = Date.now();

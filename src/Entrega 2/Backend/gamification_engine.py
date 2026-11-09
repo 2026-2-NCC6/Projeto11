@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import random
 
 RANKS = [
     (0, "Iniciante", 500),
@@ -25,9 +26,10 @@ class GamificationEngine:
     Controla o estado do jogo, pontuação dinâmica, multiplicadores de combo,
     vidas do jogador, acúmulo de XP, patentes e persistência de dados.
     """
-    def __init__(self, max_lives=3, data_dir=None):
+    def __init__(self, max_lives=3, data_dir=None, auto_spawn=False):
         self.max_lives = max_lives
         self.lives = max_lives
+        self.auto_spawn = auto_spawn
         self.score = 0
         self.rally_count = 0
         self.best_rally = 0
@@ -64,6 +66,22 @@ class GamificationEngine:
 
         # Histórico de eventos da sessão
         self.session_events = []
+
+        # -------------------------------------------------------------
+        # Mecânica de Bola Virtual, Alvos e Timing
+        # -------------------------------------------------------------
+        self.ball_id = 0
+        self.target_stroke_id = 0
+        self.target_stroke_name = "Forehand"
+        self.target_x = 0.72
+        self.target_y = 0.68
+        self.flight_duration = 2.8
+        self.spawn_time = time.time()
+        self.ball_status = 'WAITING'  # 'WAITING', 'APPROACHING', 'HIT', 'TOO_EARLY', 'TOO_LATE', 'FAULT_STROKE'
+        self.waiting_since = time.time()
+        self.last_result_time = 0.0
+        self.stroke_sequence = [0, 1, 0, 1, 2] # Ciclo dinâmico de treino
+        self.sequence_idx = 0
 
         # Diretório de persistência
         self.data_dir = data_dir or os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
@@ -106,10 +124,116 @@ class GamificationEngine:
             return 1.5
         return 1.0
 
+    def prepare_serve(self, now=None):
+        """Prepara o jogador para realizar o Saque de abertura ou de reinício após falta."""
+        now = now or time.time()
+        self.ball_id += 1
+        self.target_stroke_id = 2
+        self.target_stroke_name = "Saque"
+        self.target_x = 0.50
+        self.target_y = 0.38
+        self.flight_duration = 0.0
+        self.spawn_time = now
+        self.ball_status = 'NEED_SERVE'
+        self.last_feedback = "Execute um SAQUE para colocar a bola em jogo!"
+
+    def spawn_next_ball(self, now=None, force_stroke=None):
+        """Lança uma nova bola em direção a uma NOVA POSIÇÃO alternada da quadra."""
+        now = now or time.time()
+        self.ball_id += 1
+        
+        # Alterna entre Forehand e Backhand para dinâmica de rally realista
+        if force_stroke is not None:
+            self.target_stroke_id = force_stroke
+        else:
+            # Alterna em relação ao último golpe (se foi forehand, vai para backhand e vice-versa)
+            if self.target_stroke_id == 0:
+                self.target_stroke_id = 1
+            else:
+                self.target_stroke_id = 0
+
+        stroke_names = {0: "Forehand", 1: "Backhand", 2: "Saque"}
+        self.target_stroke_name = stroke_names[self.target_stroke_id]
+
+        import random
+        # Variação sutil da nova posição para não ser fixa no mesmo ponto
+        if self.target_stroke_id == 0:  # Forehand (quadrante direito)
+            positions = [(0.72, 0.68), (0.78, 0.72), (0.68, 0.62)]
+            self.target_x, self.target_y = random.choice(positions)
+        elif self.target_stroke_id == 1:  # Backhand (quadrante esquerdo)
+            positions = [(0.28, 0.68), (0.22, 0.72), (0.32, 0.62)]
+            self.target_x, self.target_y = random.choice(positions)
+        else:  # Saque (ponto central alto)
+            self.target_x = 0.50
+            self.target_y = 0.38
+
+        # Velocidade: ligeiramente mais rápida conforme o rally aumenta (2.6s a 1.9s)
+        speed_factor = max(0.70, 1.0 - (self.rally_count * 0.02))
+        self.flight_duration = round(2.6 * speed_factor, 2)
+        self.spawn_time = now
+        self.ball_status = 'APPROACHING'
+
+    def update_ball_state(self, now=None):
+        """
+        Atualiza a máquina de estados temporal da bola a cada frame.
+        Detecta bola perdida (TOO_LATE) e gerencia transições automáticas.
+        """
+        now = now or time.time()
+
+        if self.is_game_over:
+            self.ball_status = 'GAME_OVER'
+            return
+
+        if self.ball_status == 'WAITING':
+            if self.auto_spawn and (now - self.waiting_since) >= 1.5:
+                self.spawn_next_ball(now)
+            return
+
+        if self.ball_status == 'SERVED':
+            # Após o saque arremessar a bola para o outro lado (1.0s), o adversário rebate para uma nova posição
+            if (now - self.last_result_time) >= 1.0:
+                self.spawn_next_ball(now)
+            return
+
+        if self.ball_status in ['HIT', 'TOO_EARLY', 'TOO_LATE', 'FAULT_STROKE']:
+            # Mantém a animação de resultado por 1.3s antes de preparar a próxima jogada
+            if (now - self.last_result_time) >= 1.3:
+                if self.ball_status == 'HIT':
+                    # Acerto! O adversário rebate para uma NOVA POSIÇÃO da quadra
+                    self.spawn_next_ball(now)
+                else:
+                    # Erro/Falta cometida: Alterna entre preparar Saque de reinício ou nova bola
+                    if random.random() > 0.45:
+                        self.prepare_serve(now)
+                    else:
+                        self.spawn_next_ball(now)
+            return
+
+        if self.ball_status == 'APPROACHING':
+            progress = (now - self.spawn_time) / self.flight_duration
+            if progress > 1.05:
+                # Bola passou direto sem o jogador golpear a tempo!
+                self.ball_status = 'TOO_LATE'
+                self.last_result_time = now
+                self.faulty_strokes += 1
+                self.total_strokes += 1
+                self.perfect_streak = 0
+                self.combo_streak = 0
+                self.combo_multiplier = 1.0
+                self.lives = max(0, self.lives - 1)
+                self.last_grade = "FAULT"
+                self.last_points = 0
+                self.last_feedback = f"Bola perdida! Não golpeou a tempo (-1 Vida)"
+                self.last_event_time = now
+
+                if self.lives <= 0:
+                    self.is_game_over = True
+                    self.game_over_time = now
+
     def record_stroke(self, stroke_id, stroke_name, confidence, failed_joints, angles, quality_score, grade):
         """
         Processa um golpe avaliado pela Camada de Diagnóstico.
-        Atualiza o estado de Rally, vidas, combo e pontuação.
+        Atualiza o estado de Rally, vidas, combo e pontuação com validação de timing da bola.
         """
         if stroke_id not in [0, 1, 2]:
             return None
@@ -119,6 +243,70 @@ class GamificationEngine:
             return None
 
         now = time.time()
+        self.update_ball_state(now)
+
+        # -------------------------------------------------------------
+        # Validação de Timing da Bola Virtual e Saque
+        # -------------------------------------------------------------
+        if self.ball_status == 'NEED_SERVE':
+            if stroke_id == 2:  # Saque executado com sucesso
+                self.ball_status = 'SERVED'
+                self.last_result_time = now
+                self.successful_strokes += 1
+                self.stroke_success[stroke_name] = self.stroke_success.get(stroke_name, 0) + 1
+                self.rally_count = max(1, self.rally_count)
+                self.combo_streak = 1
+                self.combo_multiplier = 1.0
+                self.score += 150
+                self.xp += 50
+                self.update_level()
+                self.last_grade = grade if grade in ["PERFECT", "GOOD"] else "GOOD"
+                self.last_points = 150
+                self.last_feedback = "Saque potente! Bola arremessada para a quadra adversária!"
+                self.last_stroke_name = stroke_name
+                self.last_event_time = now
+                self.save_profile()
+                return {
+                    "timestamp": now,
+                    "stroke": stroke_name,
+                    "confidence": round(confidence, 2),
+                    "grade": self.last_grade,
+                    "quality_score": 1.0,
+                    "points": 150,
+                    "combo_multiplier": 1.0,
+                    "rally_count": self.rally_count,
+                    "lives": self.lives,
+                    "timing": "SERVE_HIT",
+                    "feedback": self.last_feedback
+                }
+            else:
+                # Se fez outro golpe durante o saque, já lança a bola na nova posição
+                self.spawn_next_ball(now, force_stroke=stroke_id)
+
+        if self.ball_status == 'APPROACHING':
+            progress = (now - self.spawn_time) / self.flight_duration
+
+            # 1. Movimento ANTES da bola chegar na janela (< 0.75):
+            # A vida NÃO é descontada por erro de timing prévio; orienta o jogador e mantém a bola a caminho
+            if progress < 0.75:
+                self.last_feedback = f"Aguarde a bola chegar na área de rebatida!"
+                self.last_stroke_name = stroke_name
+                self.last_event_time = now
+                self.save_profile()
+                return {
+                    "timestamp": now,
+                    "stroke": stroke_name,
+                    "confidence": round(confidence, 2),
+                    "grade": "EARLY",
+                    "quality_score": round(quality_score, 2),
+                    "points": 0,
+                    "combo_multiplier": self.combo_multiplier,
+                    "rally_count": self.rally_count,
+                    "lives": self.lives,
+                    "timing": "TOO_EARLY",
+                    "feedback": self.last_feedback
+                }
+
         self.total_strokes += 1
         self.stroke_counts[stroke_name] = self.stroke_counts.get(stroke_name, 0) + 1
 
@@ -130,6 +318,8 @@ class GamificationEngine:
         points_awarded = 0
 
         if is_success:
+            self.ball_status = 'HIT'
+            self.last_result_time = now
             self.successful_strokes += 1
             self.stroke_success[stroke_name] = self.stroke_success.get(stroke_name, 0) + 1
             self.rally_count += 1
@@ -153,21 +343,32 @@ class GamificationEngine:
             self.xp += earned_xp
             self.update_level()
 
-            feedback_text = f"Excelente {stroke_name}! (+{points_awarded} pts)"
+            feedback_text = f"Excelente {stroke_name}! Rebatida perfeita (+{points_awarded} pts)"
         else:
-            # Falha biomecânica: quebra de combo e perda de vida
-            self.faulty_strokes += 1
+            # Falha técnica ou biomecânica no movimento:
+            # A vida NÃO é descontada! (A vida só é perdida quando o jogador erra a bola).
+            # A rebatida acontece, pontuando com valor proporcional ao score de qualidade.
+            self.ball_status = 'HIT'
+            self.last_result_time = now
+            self.successful_strokes += 1
+            self.stroke_success[stroke_name] = self.stroke_success.get(stroke_name, 0) + 1
+            self.rally_count += 1
+            if self.rally_count > self.best_rally:
+                self.best_rally = self.rally_count
+
             self.perfect_streak = 0
             self.combo_streak = 0
             self.combo_multiplier = 1.0
-            self.lives = max(0, self.lives - 1)
 
-            fault_reason = ", ".join(failed_joints) if failed_joints else "Postura incorreta"
-            feedback_text = f"Falha no {stroke_name} ({fault_reason}) -1 Vida!"
+            points_awarded = int(base_points * max(0.35, quality_score) * 1.0)
+            self.score += points_awarded
 
-            if self.lives <= 0:
-                self.is_game_over = True
-                self.game_over_time = now
+            earned_xp = max(5, int(points_awarded * 0.3))
+            self.xp += earned_xp
+            self.update_level()
+
+            fault_reason = ", ".join(failed_joints) if failed_joints else "Postura imperfeita"
+            feedback_text = f"Rebatida no {stroke_name} com ajuste: {fault_reason} (+{points_awarded} pts)"
 
         # Atualiza feedback instantâneo
         self.last_stroke_id = stroke_id
@@ -240,6 +441,8 @@ class GamificationEngine:
         self.last_points = 0
         self.last_feedback = "Novo Rally iniciado! Boa sorte!"
         self.last_event_time = time.time()
+        self.ball_status = 'WAITING'
+        self.waiting_since = time.time()
 
     def reset_session(self):
         """Reinicia todas as métricas da sessão atual."""
@@ -257,14 +460,26 @@ class GamificationEngine:
             return 100.0
         return round((self.successful_strokes / self.total_strokes) * 100.0, 1)
 
-    def get_telemetry(self):
+    def get_telemetry(self, now=None):
         """Retorna estado completo serializável para WebSocket e HUD."""
+        now = now or time.time()
+        self.update_ball_state(now)
+
         min_xp, max_xp, progress_percent = self.get_xp_bounds()
 
         # Verifica se o aviso de conquista já expirou (5 segundos)
         active_achievement = None
         if self.new_achievement and (time.time() - self.new_achievement_time < 5.0):
             active_achievement = self.new_achievement
+
+        # Cálculo de progresso e timing da bola
+        ball_progress = 0.0
+        time_remaining = 0.0
+        if self.ball_status == 'APPROACHING' and self.flight_duration > 0:
+            ball_progress = min(1.1, (now - self.spawn_time) / self.flight_duration)
+            time_remaining = max(0.0, (1.0 - ball_progress) * self.flight_duration)
+        elif self.ball_status == 'HIT':
+            ball_progress = 1.0
 
         return {
             "mode": "RALLY",
@@ -292,7 +507,21 @@ class GamificationEngine:
             "xp_next": max_xp,
             "xp_progress": progress_percent,
             "unlocked_achievements": list(self.unlocked_achievements),
-            "new_achievement": active_achievement
+            "new_achievement": active_achievement,
+            "ball_challenge": {
+                "active": not self.is_game_over,
+                "ball_id": self.ball_id,
+                "target_stroke_id": self.target_stroke_id,
+                "target_stroke_name": self.target_stroke_name,
+                "target_x": self.target_x,
+                "target_y": self.target_y,
+                "flight_duration": self.flight_duration,
+                "progress": round(ball_progress, 3),
+                "time_remaining": round(time_remaining, 2),
+                "status": self.ball_status,
+                "hit_window_active": 0.75 <= ball_progress <= 1.05 and self.ball_status == 'APPROACHING',
+                "is_early": ball_progress < 0.75 and self.ball_status == 'APPROACHING'
+            }
         }
 
     def save_profile(self):

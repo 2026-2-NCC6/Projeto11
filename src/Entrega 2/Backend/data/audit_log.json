@@ -1,0 +1,347 @@
+{
+  "entries": [
+    {
+      "timestamp": "2026-11-08 15:40:45",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.59,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (104°) | Abra mais o braço no backhand",
+      "filename": "audit_falso_positivo_20261108_154045_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:41:00",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.77,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (72°)",
+      "filename": "audit_falso_positivo_20261108_154100_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:41:30",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.97,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo muito encolhido durante o swing (76°) | Terminação baixa, finalize por cima do ombro",
+      "filename": "audit_falso_positivo_20261108_154129_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:45:59",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.67,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo muito encolhido durante o swing (76°) | Terminação baixa, finalize por cima do ombro",
+      "filename": "audit_falso_positivo_20261108_154558_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:48:06",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.61,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (64°)",
+      "filename": "audit_falso_positivo_20261108_154804_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:51:13",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.78,
+      "quality_score": 1.0,
+      "grade": "PERFECT",
+      "feedback": "Movimento impecável em toda a trajetória!",
+      "filename": "audit_falso_positivo_20261108_155112_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:51:34",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.88,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (60°) | Abra mais o braço no backhand",
+      "filename": "audit_falso_positivo_20261108_155133_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:52:13",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.83,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo muito encolhido durante o swing (60°) | Terminação baixa, finalize por cima do ombro",
+      "filename": "audit_falso_positivo_20261108_155211_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:53:03",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.83,
+      "quality_score": 1.0,
+      "grade": "PERFECT",
+      "feedback": "Movimento impecável em toda a trajetória!",
+      "filename": "audit_falso_positivo_20261108_155302_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:55:41",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.83,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (65°) | Abra mais o braço no backhand",
+      "filename": "audit_falso_positivo_20261108_155540_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:56:08",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.73,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (53°)",
+      "filename": "audit_falso_positivo_20261108_155606_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:56:22",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 1.0,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (59°)",
+      "filename": "audit_falso_positivo_20261108_155621_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:56:35",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.83,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo muito encolhido durante o swing (56°)",
+      "filename": "audit_falso_positivo_20261108_155634_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:56:57",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.7,
+      "quality_score": 1.0,
+      "grade": "PERFECT",
+      "feedback": "Movimento impecável em toda a trajetória!",
+      "filename": "audit_falso_positivo_20261108_155655_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:57:20",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.88,
+      "quality_score": 1.0,
+      "grade": "PERFECT",
+      "feedback": "Movimento impecável em toda a trajetória!",
+      "filename": "audit_falso_positivo_20261108_155718_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:57:57",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.83,
+      "quality_score": 0.23999999999999994,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Estenda o braço mais no alto ao golpear",
+      "filename": "audit_falso_positivo_20261108_155756_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:58:12",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.83,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo muito encolhido durante o swing (53°) | Terminação baixa, finalize por cima do ombro",
+      "filename": "audit_falso_positivo_20261108_155810_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:58:13",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.0,
+      "quality_score": 85.0,
+      "grade": "GOOD",
+      "feedback": "",
+      "filename": "audit_falso_positivo_20261108_155812_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:58:41",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.83,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (110°)",
+      "filename": "audit_falso_positivo_20261108_155840_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:58:53",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.99,
+      "quality_score": 0.23999999999999994,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Estenda o braço mais no alto ao golpear",
+      "filename": "audit_falso_positivo_20261108_155852_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:59:12",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 1.0,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (60°)",
+      "filename": "audit_falso_positivo_20261108_155911_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:59:22",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.99,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (66°) | Abra mais o braço no backhand",
+      "filename": "audit_falso_positivo_20261108_155921_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:59:42",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.86,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (41°)",
+      "filename": "audit_falso_positivo_20261108_155940_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 15:59:58",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.68,
+      "quality_score": 0.23999999999999994,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Estenda o braço mais no alto ao golpear",
+      "filename": "audit_falso_positivo_20261108_155957_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 16:00:25",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.84,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo muito encolhido durante o swing (64°) | Faltou rotação de tronco no golpe",
+      "filename": "audit_falso_positivo_20261108_160024_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 16:00:45",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.77,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (95°)",
+      "filename": "audit_falso_positivo_20261108_160043_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 16:01:21",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "forehand",
+      "confidence": 0.79,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo muito encolhido durante o swing (71°) | Terminação baixa, finalize por cima do ombro",
+      "filename": "audit_falso_positivo_20261108_160120_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 16:03:25",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "backhand",
+      "confidence": 0.6,
+      "quality_score": 0.19999999999999996,
+      "grade": "FAULT",
+      "feedback": "Ajuste necessário: Cotovelo encolhido no backhand (71°) | Abra mais o braço no backhand",
+      "filename": "audit_falso_positivo_20261108_160323_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 16:03:56",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.61,
+      "quality_score": 1.0,
+      "grade": "PERFECT",
+      "feedback": "Movimento impecável em toda a trajetória!",
+      "filename": "audit_falso_positivo_20261108_160354_repouso.mp4"
+    },
+    {
+      "timestamp": "2026-11-08 16:04:16",
+      "action": "false_positive",
+      "target_class": "repouso",
+      "predicted_class": "saque",
+      "confidence": 0.6,
+      "quality_score": 1.0,
+      "grade": "PERFECT",
+      "feedback": "Movimento impecável em toda a trajetória!",
+      "filename": "audit_falso_positivo_20261108_160414_repouso.mp4"
+    }
+  ],
+  "summary": {
+    "total_audited": 30,
+    "confirmed": 0,
+    "corrected": 0,
+    "false_positives": 30,
+    "discarded": 18,
+    "new_videos": {
+      "forehand": 0,
+      "backhand": 0,
+      "saque": 0,
+      "repouso": 30
+    }
+  }
+}

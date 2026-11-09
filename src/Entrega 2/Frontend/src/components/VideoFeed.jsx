@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, Zap, AlertCircle, Moon, UserCheck, UserX, RefreshCw } from 'lucide-react';
+import { TennisGameCourtOverlay } from './TennisGameCourtOverlay';
+import logger from '../utils/logger';
 
 // Conexões anatômicas padrão do MediaPipe Pose
 const POSE_CONNECTIONS = [
@@ -25,11 +27,22 @@ export function VideoFeed({
   athleteDetected,
   isDark,
   telemetry,
-  onTelemetryUpdate
+  onTelemetryUpdate,
+  gameState,
+  onResetGame,
+  containerHeight = '460px'
 }) {
   const [useLocalCamera, setUseLocalCamera] = useState(false);
   const [cameraReady, setCameraReady] = useState(false);
   const [streamError, setStreamError] = useState(null);
+  const [streamKey, setStreamKey] = useState(Date.now());
+
+  // Atualiza a chave do stream quando a conexão é restabelecida
+  useEffect(() => {
+    if (isConnected) {
+      setStreamKey(Date.now());
+    }
+  }, [isConnected]);
 
   const videoRef = useRef(null);
   const overlayCanvasRef = useRef(null);
@@ -130,7 +143,7 @@ export function VideoFeed({
 
       ws.onopen = () => {
         if (unmounted) return;
-        console.log('[TenniSync] Canal de vídeo WebSocket (/ws/video) pronto.');
+        logger.info('WEBSOCKET', 'Canal de vídeo WebSocket (/ws/video) pronto.');
       };
 
       ws.onmessage = (event) => {
@@ -147,12 +160,12 @@ export function VideoFeed({
             clearSkeletonOverlay();
           }
         } catch (e) {
-          console.error('[TenniSync] Erro ao processar telemetria de vídeo:', e);
+          logger.error('WEBSOCKET', 'Erro ao processar telemetria de vídeo recebida:', e);
         }
       };
 
       ws.onerror = (e) => {
-        console.warn('[TenniSync] Erro no WebSocket /ws/video:', e);
+        logger.warn('WEBSOCKET', 'Erro no canal WebSocket de vídeo (/ws/video):', e);
         isSendingFrameRef.current = false;
       };
 
@@ -160,7 +173,7 @@ export function VideoFeed({
         isSendingFrameRef.current = false;
       };
     } catch (e) {
-      console.warn('[TenniSync] Falha ao instanciar WebSocket /ws/video:', e);
+      logger.error('WEBSOCKET', 'Falha ao instanciar WebSocket /ws/video:', e);
     }
 
     // 2. Abre a câmera do navegador via getUserMedia
@@ -186,6 +199,7 @@ export function VideoFeed({
             videoRef.current.play().catch(() => {});
             setCameraReady(true);
             setStreamError(null);
+            logger.info('CAM/STREAM', 'Webcam do navegador iniciada e transmitindo a 30 FPS.');
           };
         }
 
@@ -221,7 +235,7 @@ export function VideoFeed({
       })
       .catch((err) => {
         if (unmounted) return;
-        console.warn('[TenniSync] Câmera local indisponível:', err);
+        logger.error('CAM/STREAM', 'Câmera local indisponível no navegador:', err);
         setStreamError('Câmera indisponível no navegador. Verifique permissões.');
         setUseLocalCamera(false);
       });
@@ -305,7 +319,7 @@ export function VideoFeed({
       </div>
 
       {/* Área de Visualização Principal */}
-      <div style={{ position: 'relative', width: '100%', height: '440px', background: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: '100%', height: containerHeight, background: '#020617', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
         
         {/* Modo 1: Câmera Local do Navegador com Canvas de Esqueleto sobreposto */}
         {useLocalCamera ? (
@@ -334,13 +348,15 @@ export function VideoFeed({
             />
           </div>
         ) : isConnected ? (
-          /* Modo 2: Stream MJPEG do Backend (OpenCV) */
+          /* Modo 2: Stream MJPEG do Backend com Landmarks MediaPipe */
           <img
-            src="/api/video_feed"
+            key={streamKey}
+            src={`/api/video_feed?t=${streamKey}`}
             alt="Feed ao vivo TenniSync OpenCV"
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            onError={(e) => {
-              e.target.style.display = 'none';
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            onError={() => {
+              // Tenta reconectar o stream automaticamente após 1.5s
+              setTimeout(() => setStreamKey(Date.now()), 1500);
             }}
           />
         ) : (
@@ -383,6 +399,24 @@ export function VideoFeed({
             </code>
           </div>
         )}
+
+        {/* Camada de Gamificacao do Jogo Virtual (Quadra, Sombra, Bola 3D, Timing e Multiplayer 2 Jogadores) */}
+        <TennisGameCourtOverlay
+          telemetry={telemetry}
+          athleteDetected={athleteDetected}
+          ballChallenge={gameState?.ball_challenge || telemetry?.game?.ball_challenge}
+          lives={gameState?.lives ?? telemetry?.game?.lives ?? 3}
+          maxLives={gameState?.max_lives ?? telemetry?.game?.max_lives ?? 3}
+          score={gameState?.score ?? telemetry?.game?.score ?? 0}
+          comboStreak={gameState?.combo_streak ?? telemetry?.game?.combo_streak ?? 0}
+          comboMultiplier={gameState?.combo_multiplier ?? telemetry?.game?.combo_multiplier ?? 1.0}
+          rallyCount={gameState?.rally_count ?? telemetry?.game?.rally_count ?? 0}
+          bestRally={gameState?.best_rally ?? telemetry?.game?.best_rally ?? 0}
+          isGameOver={gameState?.is_game_over ?? telemetry?.game?.is_game_over ?? false}
+          lastFeedback={gameState?.last_feedback ?? telemetry?.game?.last_feedback ?? ''}
+          lastGrade={gameState?.last_grade ?? telemetry?.game?.last_grade ?? 'NONE'}
+          onResetGame={onResetGame}
+        />
 
         {/* HUD Overlay em tempo real sobre o vídeo */}
         <div style={{

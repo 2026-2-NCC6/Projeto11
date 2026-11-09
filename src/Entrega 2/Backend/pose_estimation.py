@@ -8,6 +8,11 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 try:
+    from logger import log_debug, log_info, log_warn, log_error, log_sampled
+except ImportError:
+    from Backend.logger import log_debug, log_info, log_warn, log_error, log_sampled
+
+try:
     import numpy as np
     HAS_NUMPY = True
 except ImportError:
@@ -52,10 +57,12 @@ from gamification_engine import GamificationEngine
 from hud_renderer import TennisHUD
 
 MAPA_LEDS = {
-    "ombro_esq": b'A', "ombro_dir": b'B', "cotovelo_esq": b'C', 
-    "cotovelo_dir": b'D', "pulso_esq": b'E', "pulso_dir": b'F',
-    "quadril_esq": b'G', "quadril_dir": b'H', "joelho_esq": b'I', 
-    "joelho_dir": b'J', "tornozelo_esq": b'K', "tornozelo_dir": b'L'
+    "ombro_dir": b'A', "ombro_esq": b'B',
+    "cotovelo_dir": b'C', "cotovelo_esq": b'D',
+    "pulso_dir": b'E', "pulso_esq": b'F',
+    "quadril_dir": b'G', "quadril_esq": b'H',
+    "joelho_dir": b'I', "joelho_esq": b'J',
+    "tornozelo_dir": b'K', "tornozelo_esq": b'L'
 }
 
 def process_landmarks_to_tensor(landmarks):
@@ -209,10 +216,14 @@ class TennisSyncEngine:
 
         # Buffer circular de Replay: 5 segundos de frames a 30 FPS = 150 frames em memória
         self.replay_buffer = collections.deque(maxlen=150)
+        self.clean_replay_buffer = collections.deque(maxlen=150)
+        self.landmarks_replay_buffer = collections.deque(maxlen=150)
         self.replays_dir = os.path.join(BASE_DIR, "replays")
         os.makedirs(self.replays_dir, exist_ok=True)
         self.latest_replay_filename = None
         self.latest_replay_url = None
+        self.latest_clean_filename = None
+        self.latest_clean_path = None
 
         latest_mp4 = os.path.join(self.replays_dir, "replay_latest.mp4")
         if os.path.exists(latest_mp4) and os.path.getsize(latest_mp4) > 1000:
@@ -245,12 +256,15 @@ class TennisSyncEngine:
         self.stroke_display_until = 0.0      # Mantém feedback visível por 3.5s
         self.stroke_cooldown_until = 0.0     # Impede disparos repetidos por 2.5s
         self.event_id = 0                    # Identificador único de cada golpe real
+        self.new_event_flag = False
+        self.current_grade = "GOOD"
+        self.current_quality_score = 85.0
         self.athlete_detected = False
         self.is_dark = False
         self.no_pose_consecutive = 0
 
         # Motor de Gamificação e Renderizador HUD
-        self.game_engine = GamificationEngine()
+        self.game_engine = GamificationEngine(auto_spawn=False)
         self.hud = TennisHUD()
 
     def set_lateralidade(self, lateralidade):
@@ -262,6 +276,13 @@ class TennisSyncEngine:
     def reset_session(self):
         self.game_engine.reset_session()
 
+    def reload_model(self):
+        """Recarrega os pesos treinados do modelo TennisTransformer sem reiniciar o servidor."""
+        print("[TennisSyncEngine] Recarregando pesos do modelo TennisTransformerGPU...", flush=True)
+        self.tennis_model = TennisTransformerGPU()
+        if HAS_TORCH:
+            self.tennis_model = self.tennis_model.to(self.device)
+
     def _save_replay_clip(self, stroke_name: str, event_id: int):
         """
         Salva os frames dos últimos 5 segundos do buffer de replay
@@ -271,6 +292,7 @@ class TennisSyncEngine:
             return
 
         frames_snapshot = list(self.replay_buffer)
+        clean_snapshot = list(self.clean_replay_buffer) if len(self.clean_replay_buffer) >= 15 else frames_snapshot
         h, w = frames_snapshot[0].shape[:2]
         fps_out = max(15.0, min(30.0, self.fps))
 
@@ -279,7 +301,12 @@ class TennisSyncEngine:
         unique_path = os.path.join(self.replays_dir, unique_name)
         latest_path = os.path.join(self.replays_dir, "replay_latest.mp4")
 
+        clean_name = f"clean_{timestamp_str}_{stroke_name.lower()}_e{event_id}.mp4"
+        clean_path = os.path.join(self.replays_dir, clean_name)
+        clean_latest = os.path.join(self.replays_dir, "clean_replay_latest.mp4")
+
         try:
+            # 1. Salva vídeo anotado para visualização no navegador
             out = create_compatible_videowriter(unique_path, fps_out, w, h)
             if out is not None and out.isOpened():
                 for f in frames_snapshot:
@@ -289,13 +316,24 @@ class TennisSyncEngine:
                 print(f"[TenniSync Replay] Erro: Não foi possível inicializar VideoWriter para {unique_path}", flush=True)
                 return
 
+            # 2. Salva vídeo limpo da câmera para treinamento da IA
+            out_clean = create_compatible_videowriter(clean_path, fps_out, w, h)
+            if out_clean is not None and out_clean.isOpened():
+                for f in clean_snapshot:
+                    out_clean.write(f)
+                out_clean.release()
+
+            import shutil
             if os.path.exists(unique_path) and os.path.getsize(unique_path) > 1000:
-                import shutil
                 shutil.copyfile(unique_path, latest_path)
+            if os.path.exists(clean_path) and os.path.getsize(clean_path) > 1000:
+                shutil.copyfile(clean_path, clean_latest)
 
             self.latest_replay_filename = unique_name
+            self.latest_clean_filename = clean_name
+            self.latest_clean_path = clean_path
             self.latest_replay_url = f"/api/replay/latest?t={int(time.time()*1000)}"
-            print(f"[TenniSync Replay] Gravado clipe de 5s ({len(frames_snapshot)} frames em H.264): {unique_name}", flush=True)
+            print(f"[TenniSync Replay] Gravado clipe duplo de 5s (Anotado + Limpo): {unique_name}", flush=True)
         except Exception as e:
             print(f"[TenniSync Replay] Erro ao salvar vídeo de replay: {e}", flush=True)
 
@@ -310,6 +348,9 @@ class TennisSyncEngine:
         delta = c_time - self.p_time
         self.fps = 1.0 / delta if delta > 0 else 30.0
         self.p_time = c_time
+
+        # A física e o timing da bola são gerenciados pelo Frontend (TennisGameCourtOverlay).
+        # Não executamos update_ball_state() cego a cada frame para não gerar bolas fantasmas nem descontar vidas no escuro.
 
         # -------------------------------------------------------------
         # 1. Validação de Entrada de Vídeo
@@ -363,6 +404,8 @@ class TennisSyncEngine:
 
         if has_valid_pose:
             self.current_landmarks = landmarks
+            if not self.athlete_detected:
+                log_info("POSE-AI", "Atleta detectado em campo (33 landmarks 3D ativos)")
             self.athlete_detected = True
             self.no_pose_consecutive = 0
 
@@ -382,8 +425,10 @@ class TennisSyncEngine:
                     landmark_drawing_spec=pose_style
                 )
 
-            # Salva o frame anotado no buffer circular de 5 segundos (150 frames máx)
+            # Salva o frame anotado e o frame limpo no buffer circular de 5 segundos
             self.replay_buffer.append(annotated_frame)
+            self.clean_replay_buffer.append(frame.copy())
+            self.landmarks_replay_buffer.append(landmarks)
 
             # Normaliza coordenadas e alimenta o buffer temporal com timestamp
             centered_coords = process_landmarks_to_tensor(landmarks)
@@ -398,7 +443,7 @@ class TennisSyncEngine:
             # ---------------------------------------------------------
             # Janela física de ~0.9s a 2.2s com pelo menos 10 frames
             time_span = (self.frame_buffer[-1][0] - self.frame_buffer[0][0]) if len(self.frame_buffer) > 1 else 0.0
-            if len(self.frame_buffer) >= 10 and time_span >= 0.9:
+            if len(self.frame_buffer) >= 8 and time_span >= 0.45:
                 # Só executa nova classificação se já passou o tempo de cooldown
                 if c_time >= self.stroke_cooldown_until:
                     times = np.array([item[0] for item in self.frame_buffer])
@@ -426,32 +471,52 @@ class TennisSyncEngine:
                     torso_motion = float((np.std(buffer_arr[:, 11, :2], axis=0).mean() + 
                                           np.std(buffer_arr[:, 12, :2], axis=0).mean()) / 2.0)
                     
-                    # Calibração cinemática temporal unilateral:
-                    is_kinematically_active = (wrist_motion_max >= 0.038 and wrist_disp_max >= 0.20) or                                               (torso_motion >= 0.024 and wrist_disp_max >= 0.17)
+                    # Calibração cinemática responsiva (detecta golpes em ambientes internos e fundo de sala)
+                    is_kinematically_active = (wrist_motion_max >= 0.016 and wrist_disp_max >= 0.09) or \
+                                              (torso_motion >= 0.010 and wrist_disp_max >= 0.07)
 
-                    # Se for golpe ativo (0=Forehand, 1=Backhand, 2=Saque) com confiança calibrada E movimento dinâmico real
-                    if class_id in [0, 1, 2] and confidence >= 0.75 and is_kinematically_active:
+                    # Se for golpe ativo (0=Forehand, 1=Backhand, 2=Saque) com dinamismo real
+                    if class_id in [0, 1, 2] and confidence >= 0.58 and is_kinematically_active:
                         stroke_names = {0: "Forehand", 1: "Backhand", 2: "Saque"}
                         self.current_stroke_id = int(class_id)
                         self.current_stroke_name = stroke_names[class_id]
                         self.current_confidence = float(confidence)
                         self.event_id += 1
 
+                        log_info("TRANSFORMER", f"Golpe classificado pela IA: {self.current_stroke_name}", {
+                            "confianca": f"{confidence*100:.1f}%",
+                            "event_id": self.event_id
+                        })
+
                         # Fica visível na tela por 3.5 segundos sem piscar
                         self.stroke_display_until = c_time + 3.5
-                        # Bloqueia novos disparos pelos próximos 2.0 segundos
-                        self.stroke_cooldown_until = c_time + 2.5
+                        self.stroke_cooldown_until = c_time + 1.2
+                        self.new_event_flag = True
 
-                        # Avaliação biomecânica do golpe detectado
-                        feedback_str, angles_dict, failed, quality_score, grade = rule_engine.evaluate_stroke(
-                            class_id, landmarks, lateralidade=self.lateralidade
-                        )
+                        # Avaliação biomecânica contínua da trajetória
+                        if len(self.landmarks_replay_buffer) >= 15:
+                            feedback_str, angles_dict, failed, quality_score, grade, _ = rule_engine.evaluate_stroke_trajectory(
+                                class_id, list(self.landmarks_replay_buffer), lateralidade=self.lateralidade
+                            )
+                        else:
+                            feedback_str, angles_dict, failed, quality_score, grade = rule_engine.evaluate_stroke(
+                                class_id, landmarks, lateralidade=self.lateralidade
+                            )
                         self.current_feedback = feedback_str
+                        self.current_grade = grade
+                        self.current_quality_score = float(quality_score)
                         self.angles = {k: float(v) for k, v in angles_dict.items()}
                         self.failed_joints = failed
 
-                        # Salva o vídeo de replay dos últimos 5 segundos com esqueleto
-                        self._save_replay_clip(self.current_stroke_name, self.event_id)
+                        log_info("BIOMECHANICS", f"Avaliação biomecânica: {self.current_grade} (Score: {self.current_quality_score:.1f})", {
+                            "golpe": self.current_stroke_name,
+                            "falhas": self.failed_joints,
+                            "feedback": self.current_feedback
+                        })
+
+                        # Salva o vídeo de replay de forma assíncrona para não derrubar o FPS da câmera
+                        import threading
+                        threading.Thread(target=self._save_replay_clip, args=(self.current_stroke_name, self.event_id), daemon=True).start()
 
                         # Atualiza motor de gamificação
                         self.game_engine.record_stroke(
@@ -484,6 +549,8 @@ class TennisSyncEngine:
             self.no_pose_consecutive += 1
             # Tolerância estendida para 10 frames (~0.5s) para absorver oclusões rápidas em corpo inteiro
             if self.no_pose_consecutive >= 10:
+                if self.athlete_detected:
+                    log_warn("POSE-AI", "Atleta saiu do campo de visão da câmera (Aguardando atleta...)")
                 self.athlete_detected = False
                 self.frame_buffer.clear()
 
@@ -534,9 +601,20 @@ class TennisSyncEngine:
             except Exception:
                 landmarks_data = None
 
+        is_new = self.new_event_flag
+        self.new_event_flag = False
+
+        log_sampled("vision_heartbeat", 4.0, "CAM/STREAM", f"Pipeline de visão ativo: {self.fps:.1f} FPS", {
+            "atleta_detectado": self.athlete_detected,
+            "stroke": self.current_stroke_name
+        })
+
         return {
             "timestamp": time.time(),
             "fps": round(self.fps, 1),
+            "new_event": is_new,
+            "grade": getattr(self, "current_grade", "GOOD"),
+            "quality_score": getattr(self, "current_quality_score", 85.0),
             "stroke_id": self.current_stroke_id,
             "stroke_name": self.current_stroke_name,
             "confidence": round(self.current_confidence, 2),

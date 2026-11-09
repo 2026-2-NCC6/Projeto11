@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Play, Pause, RotateCcw, Volume2, VolumeX, Radio, Cpu, User } from 'lucide-react';
+import { Activity, Play, Pause, RotateCcw, Volume2, VolumeX, Radio, Cpu, User, Gamepad2, Columns, LayoutDashboard } from 'lucide-react';
 
 export function Navbar({
   isConnected,
@@ -8,6 +8,8 @@ export function Navbar({
   sessionSeconds,
   lateralidade,
   audioEnabled,
+  viewMode = 'dashboard',
+  onChangeViewMode = () => {},
   onToggleSession,
   onResetSession,
   onToggleHandedness,
@@ -94,7 +96,84 @@ export function Navbar({
           </div>
         </div>
 
-        {/* Painel de Controles e Preferências */}
+        {/* Seletor de Modo de Visualizacao */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          background: 'rgba(15, 23, 42, 0.7)',
+          border: '1px solid rgba(255, 255, 255, 0.1)',
+          borderRadius: '10px',
+          padding: '3px',
+          gap: '2px'
+        }}>
+          <button
+            onClick={() => onChangeViewMode('fullscreen')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '0.76rem',
+              fontWeight: '600',
+              borderRadius: '7px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              background: viewMode === 'fullscreen' ? '#10b981' : 'transparent',
+              color: viewMode === 'fullscreen' ? '#ffffff' : '#94a3b8'
+            }}
+            title="Camera Cheia (100% largura) com Jogo Virtual e complementos inferiores"
+          >
+            <Gamepad2 size={14} />
+            <span>Câmera Cheia (Jogo)</span>
+          </button>
+
+          <button
+            onClick={() => onChangeViewMode('split_iot')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '0.76rem',
+              fontWeight: '600',
+              borderRadius: '7px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              background: viewMode === 'split_iot' ? '#10b981' : 'transparent',
+              color: viewMode === 'split_iot' ? '#ffffff' : '#94a3b8'
+            }}
+            title="Visao 3/4 Camera + 1/4 Boneco IoT a direita"
+          >
+            <Columns size={14} />
+            <span>3/4 Câmera + IoT</span>
+          </button>
+
+          <button
+            onClick={() => onChangeViewMode('dashboard')}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              fontSize: '0.76rem',
+              fontWeight: '600',
+              borderRadius: '7px',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              background: viewMode === 'dashboard' ? '#10b981' : 'transparent',
+              color: viewMode === 'dashboard' ? '#ffffff' : '#94a3b8'
+            }}
+            title="Painel analitico modular classico"
+          >
+            <LayoutDashboard size={14} />
+            <span>Painel Clássico</span>
+          </button>
+        </div>
+
+        {/* Painel de Controles e Preferencias */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           
           {/* Lateralidade (US07) */}

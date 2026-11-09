@@ -138,7 +138,7 @@ def main():
     class_weights = torch.tensor(len(y_train) / (4.0 * class_counts), dtype=torch.float32, device=device)
 
     model = TennisTransformerNet(num_classes=4).to(device)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(weight=class_weights)
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
 

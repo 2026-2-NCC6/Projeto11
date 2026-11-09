@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createMockStream } from '../services/mockService';
+import logger from '../utils/logger';
 
 export function useTennisSync() {
   const [isConnected, setIsConnected] = useState(false);
@@ -57,12 +58,16 @@ export function useTennisSync() {
   const handleTelemetryUpdate = useCallback((data) => {
     setTelemetry(data);
 
-    if (
-      sessionActiveRef.current &&
-      data.stroke_id >= 0 &&
-      data.stroke_id <= 2 &&
-      data.confidence >= 0.60
-    ) {
+    if (sessionActiveRef.current && data.stroke_id >= 0 && data.stroke_id <= 2) {
+      if (data.confidence < 0.60) {
+        logger.debug('STROKE-REJECT', 'Golpe descartado da telemetria por baixa confiança (< 60%)', {
+          stroke: data.stroke_name,
+          confidence: data.confidence,
+          eventId: data.event_id
+        });
+        return;
+      }
+
       const eventId = data.event_id;
       const now = Date.now();
       const isNewEvent = (eventId && eventId > 0 && eventId !== lastHandledEventIdRef.current) ||
@@ -86,6 +91,13 @@ export function useTennisSync() {
         };
 
         setHistory(prev => [newEntry, ...prev.slice(0, 49)]);
+
+        logger.info('STROKE-HIT', `Novo golpe registrado no histórico: ${data.stroke_name}`, {
+          stroke: data.stroke_name,
+          confidence: `${Math.round(data.confidence * 100)}%`,
+          status: isApproved ? 'Aprovado' : 'Correção Necessária',
+          falhas: data.failed_joints || []
+        });
 
         // Disparo de voz corretiva se falhou ou de aprovação
         if (data.feedback) {
@@ -115,7 +127,7 @@ export function useTennisSync() {
 
         ws.onopen = () => {
           if (unmounted) return;
-          console.log('[TenniSync] WebSocket conectado com sucesso ao Backend!');
+          logger.info('WEBSOCKET', 'Canal de telemetria conectado (/ws/telemetry)');
           setIsConnected(true);
           setIsDemoMode(false);
           if (mockCleanup) {
@@ -132,13 +144,13 @@ export function useTennisSync() {
             const data = JSON.parse(event.data);
             handleTelemetryUpdateRef.current(data);
           } catch (e) {
-            console.error('Erro ao analisar mensagem WebSocket:', e);
+            logger.error('WEBSOCKET', 'Falha ao decodificar JSON da telemetria', { error: e?.message });
           }
         };
 
         ws.onclose = () => {
           if (unmounted) return;
-          console.log('[TenniSync] WebSocket desconectado. Ativando fallback de simulação...');
+          logger.warn('WEBSOCKET', 'Canal de telemetria fechado. Ativando fallback de simulação e agendando reconexão...');
           setIsConnected(false);
           setIsDemoMode(true);
           if (!mockCleanup) {
@@ -148,11 +160,11 @@ export function useTennisSync() {
         };
 
         ws.onerror = (err) => {
-          console.warn('[TenniSync] Erro na conexão WebSocket:', err);
+          logger.error('WEBSOCKET', 'Erro na conexão WebSocket de telemetria', err);
           ws.close();
         };
       } catch (err) {
-        console.warn('Erro ao inicializar WebSocket:', err);
+        logger.error('WEBSOCKET', 'Falha ao inicializar WebSocket de telemetria', err);
         setIsDemoMode(true);
         if (!mockCleanup) {
           mockCleanup = createMockStream((d) => handleTelemetryUpdateRef.current(d));
@@ -203,13 +215,14 @@ export function useTennisSync() {
   const resetSession = () => {
     setSessionSeconds(0);
     setHistory([]);
-    // Avisa o backend também
-    fetch('/api/session/reset', { method: 'POST' }).catch(() => {});
+    logger.info('SYSTEM', 'Sessão reiniciada pelo usuário');
+    logger.fetchWithLog('/api/session/reset', { method: 'POST' }, 'API-HTTP');
   };
 
   const toggleHandedness = () => {
     const next = lateralidade === 'destro' ? 'canhoto' : 'destro';
     setLateralidade(next);
+    logger.info('SYSTEM', `Lateralidade alterada para: ${next}`);
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'config', lateralidade: next }));
     }
@@ -218,7 +231,8 @@ export function useTennisSync() {
   const toggleAudio = () => setAudioEnabled(prev => !prev);
 
   const resetRallyGame = () => {
-    fetch('/api/game/reset', { method: 'POST' }).catch(() => {});
+    logger.info('SYSTEM', 'Partida reiniciada pelo usuário');
+    logger.fetchWithLog('/api/game/reset', { method: 'POST' }, 'API-HTTP');
   };
 
   return {

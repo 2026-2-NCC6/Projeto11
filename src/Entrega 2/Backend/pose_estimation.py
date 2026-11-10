@@ -50,6 +50,7 @@ try:
 except ImportError:
     HAS_TORCH = False
 
+from camera_utils import get_usb_camera_source, is_camera_blacklisted
 from angle_calculator import get_landmark_coord
 import rule_engine
 from models.tennis_transformer import TennisTransformerGPU
@@ -181,7 +182,11 @@ class TennisSyncEngine:
     - Exportador automático do clipe de replay .mp4 para o frontend.
     """
     def __init__(self, source="0", lateralidade="destro", arduino_port="COM4"):
-        self.source = int(source) if str(source).isdigit() else source
+        # DIRETRIZ ESTRITA: Câmera integrada do notebook é permanentemente bloqueada
+        if source == "0" or source == 0 or is_camera_blacklisted(source):
+            self.source = get_usb_camera_source(source)
+        else:
+            self.source = int(source) if str(source).isdigit() else source
         self.lateralidade = lateralidade
         self.device = 'cuda' if (HAS_TORCH and torch.cuda.is_available()) else 'cpu'
 
@@ -656,8 +661,8 @@ class TennisSyncEngine:
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="TenniSync - Arcade de Tênis e Visão Computacional")
-    parser.add_argument("--source", type=str, default="0",
-                        help="Índice da câmera (ex: 0) ou caminho para vídeo (.mp4).")
+    parser.add_argument("--source", type=str, default=None,
+                        help="Índice da câmera ou caminho para vídeo (.mp4). O sistema seleciona automaticamente a câmera USB externa.")
     parser.add_argument("--lateralidade", type=str, default="destro",
                         choices=["destro", "canhoto"], help="Lateralidade do tenista.")
     parser.add_argument("--headless", action="store_true",
@@ -683,8 +688,10 @@ def main():
         finally:
             engine.close()
     else:
-        video_src = int(args.source) if args.source.isdigit() else args.source
-        cap = cv2.VideoCapture(video_src)
+        video_src = engine.source
+        cap = cv2.VideoCapture(video_src, cv2.CAP_DSHOW)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(video_src)
         window_title = "TenniSync Arcade - [R] Reiniciar Rally | [Q] Sair"
 
         try:

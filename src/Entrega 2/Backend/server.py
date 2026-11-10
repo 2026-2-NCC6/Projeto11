@@ -35,12 +35,16 @@ try:
 except ImportError:
     from Backend.logger import log_debug, log_info, log_warn, log_error, log_exception, log_sampled, get_recent_logs
 
+from camera_utils import get_usb_camera_source, is_camera_blacklisted, get_usb_camera_name, list_available_cameras
 from pose_estimation import TennisSyncEngine
 
 # Estado Global do Serviço
 class ServerState:
     def __init__(self):
-        self.camera_source = 0
+        # DIRETRIZ ESTRITA: O sistema JAMAIS usa a câmera frontal integrada ao notebook.
+        # Seleciona compulsoriamente a câmera externa conectada via USB.
+        self.camera_source = get_usb_camera_source()
+        self.camera_name = get_usb_camera_name()
         self.lateralidade = "destro"
         self.is_running = True
         self.camera_paused = False
@@ -165,7 +169,11 @@ def video_worker():
             time.sleep(0.04)
             continue
 
-        # Modo Câmera do Backend (OpenCV autônomo)
+        # Modo Câmera do Backend (OpenCV autônomo com bloqueio estrito da câmera integrada)
+        if is_camera_blacklisted(state.camera_source):
+            log_warn("CAM/STREAM", f"Fonte {state.camera_source} é câmera integrada! Forçando câmera USB...")
+            state.camera_source = get_usb_camera_source()
+            state.camera_name = get_usb_camera_name()
         frame = None
         if HAS_CV2:
             if state.cap is None or not state.cap.isOpened():
@@ -245,6 +253,9 @@ def get_status():
         "status": "online",
         "lateralidade": state.lateralidade,
         "camera_source": state.camera_source,
+        "camera_name": getattr(state, "camera_name", "Câmera USB"),
+        "camera_type": "USB Externa",
+        "integrated_camera_blocked": True,
         "camera_connected": (state.cap is not None and state.cap.isOpened()) or (time.time() - state.last_client_frame_time < 2.0),
         "client_streaming": time.time() - state.last_client_frame_time < 2.0,
         "arduino_connected": state.engine.feedback_arduino is not None if state.engine else False,
@@ -259,11 +270,17 @@ def get_telemetry():
 @app.post("/api/settings")
 def update_settings(payload: SettingsPayload):
     state.lateralidade = payload.lateralidade
+    if payload.source is not None:
+        if is_camera_blacklisted(payload.source):
+            log_warn("GAME-API", f"Tentativa de usar câmera frontal/integrada ({payload.source}) bloqueada por diretriz estrita. Mantendo câmera USB.")
+        else:
+            state.camera_source = get_usb_camera_source(payload.source)
+            state.camera_name = get_usb_camera_name()
     if state.engine:
         state.engine.set_lateralidade(payload.lateralidade)
     state.latest_telemetry["lateralidade"] = payload.lateralidade
-    log_info("GAME-API", f"Configurações atualizadas: lateralidade={payload.lateralidade}")
-    return {"message": "Configurações atualizadas", "lateralidade": state.lateralidade}
+    log_info("GAME-API", f"Configurações atualizadas: lateralidade={payload.lateralidade}, camera_source={state.camera_source}")
+    return {"message": "Configurações atualizadas", "lateralidade": state.lateralidade, "camera_source": state.camera_source, "camera_name": getattr(state, "camera_name", "Câmera USB")}
 
 @app.post("/api/game/miss")
 def report_game_miss():

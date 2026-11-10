@@ -3,6 +3,9 @@ import { Camera, Zap, AlertCircle, Moon, UserCheck, UserX, RefreshCw } from 'luc
 import { TennisGameCourtOverlay } from './TennisGameCourtOverlay';
 import logger from '../utils/logger';
 
+// Termos para bloqueio absoluto da câmera integrada/frontal do notebook
+const BLACKLIST_CAMERA_TERMS = ['integrated', 'internal', 'interna', 'built-in', 'builtin', 'front', 'notebook', 'laptop', 'facetime'];
+
 // Conexões anatômicas padrão do MediaPipe Pose
 const POSE_CONNECTIONS = [
   // Tronco
@@ -176,15 +179,46 @@ export function VideoFeed({
       logger.error('WEBSOCKET', 'Falha ao instanciar WebSocket /ws/video:', e);
     }
 
-    // 2. Abre a câmera do navegador via getUserMedia
-    navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
-        frameRate: { ideal: 30, max: 30 }
-      },
-      audio: false
-    })
+    // 2. Abre estritamente a câmera USB do navegador via getUserMedia (bloqueia frontal)
+    (async () => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        throw new Error('API mediaDevices não suportada pelo navegador.');
+      }
+
+      let devices = await navigator.mediaDevices.enumerateDevices();
+      let videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+      // Se os labels estiverem vazios (permissão não solicitada ainda), pede temporário para listar
+      if (videoDevices.length > 0 && !videoDevices[0].label) {
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        devices = await navigator.mediaDevices.enumerateDevices();
+        videoDevices = devices.filter(d => d.kind === 'videoinput');
+        tempStream.getTracks().forEach(t => t.stop());
+      }
+
+      // Filtra descartando categoricamente qualquer câmera frontal ou integrada
+      const usbCameras = videoDevices.filter(d => {
+        const label = (d.label || '').toLowerCase();
+        return !BLACKLIST_CAMERA_TERMS.some(term => label.includes(term));
+      });
+
+      if (usbCameras.length === 0) {
+        throw new Error('Câmera frontal integrada bloqueada por regra de negócio. Conecte uma câmera na porta USB para continuar.');
+      }
+
+      const chosen = usbCameras[0];
+      logger.info('CAM/STREAM', `Câmera USB selecionada no navegador: ${chosen.label || 'Câmera USB Externa'}`);
+
+      return await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: { exact: chosen.deviceId },
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          frameRate: { ideal: 30, max: 30 }
+        },
+        audio: false
+      });
+    })()
       .then((s) => {
         if (unmounted) {
           s.getTracks().forEach(t => t.stop());
@@ -285,6 +319,14 @@ export function VideoFeed({
               <Moon size={11} /> Pouca Luz
             </span>
           )}
+
+          <span className="badge badge-emerald" style={{ fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            🔌 Câmera USB Ativa
+          </span>
+
+          <span className="badge badge-slate" style={{ fontSize: '0.68rem', display: 'flex', alignItems: 'center', gap: '4px', opacity: 0.8 }} title="A câmera frontal integrada do notebook está bloqueada permanentemente pelo sistema">
+            🚫 Frontal Bloqueada
+          </span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

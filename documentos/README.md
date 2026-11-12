@@ -42,14 +42,14 @@
 
 ### Projeto Interdisciplinar: Internet das Coisas e Robótica
 
-| **Aluno(s) Responsável(veis)** |[preencher] |
+| **Aluno(s) Responsável(veis)** | Bernardo Seijas Cavalcante |
 | :--- | :--- |
-| **Ferramenta utilizada** | [preencher] |
-| **Versão/modelo** | [preencher] |
-| **Disciplina / Trabalho** | [preencher] |
-| **Finalidade de uso** | [preencher] |
-| ***Prompts* principais utilizados** | [preencher] |
-| **Trechos ou entregas afetadas** | [preencher] |
+| **Ferramenta utilizada** | Gemini |
+| **Versão/modelo** | Gemini 3.1 Pro |
+| **Disciplina / Trabalho** | Projeto Interdisciplinar: Internet das Coisas e Robótica |
+| **Finalidade de uso** | Montar o arquivo da entrega a partir de tudo o que foi discutido e do plano elaborado |
+| ***Prompts* principais utilizados** | “Complemente a documentação sem perder nada do que foi abordado, apenas adicione que também pretendemos implementar um reforço por comando de voz, ou seja, uma caixa de som será integrada ao circuito para falar com o usuário e intruí-lo no tocante aos seus movimentos” (Dei a visão geral da documentação que fizemos em um arquivo contexto-projeto.md) |
+| **Trechos ou entregas afetadas** | Projeto Interdisciplinar |
 
 
 ### Sistemas Embarcados e Robótica

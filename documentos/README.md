@@ -115,27 +115,27 @@
 
 ### Projeto Interdisciplinar: Internet das Coisas e Robótica
 
-| **Aluno(s) Responsável(veis)** |[preencher] |
+| **Aluno(s) Responsável(veis)** | Bernardo Seijas Cavalcante |
 | :--- | :--- |
-| **Ferramenta utilizada** | [preencher] |
-| **Versão/modelo** | [preencher] |
-| **Disciplina / Trabalho** | [preencher] |
-| **Finalidade de uso** | [preencher] |
-| ***Prompts* principais utilizados** | [preencher] |
-| **Trechos ou entregas afetadas** | [preencher] |
+| **Ferramenta utilizada** | Gemini |
+| **Versão/modelo** | Gemini 3.8 Flash |
+| **Disciplina / Trabalho** | Projeto Interdisciplinar: Internet das Coisas e Robótica |
+| **Finalidade de uso** | Utilizamos o Antigravity para a construção do protótipo |
+| ***Prompts* principais utilizados** | "A partir do conteúdo descrito no arquivo [integration_iot.md](file;file:///c:/Projetos/tenissync/integration_iot.md) , elabore um plano de implementação para integrar essa nova funcionalidade ao sistema levando em consideração a estrutura de detecção de movimentos atual"; "Elabore um plano de implementação para transformar esse sistema em uma página Web, por meio da qual o usuário possa visualizar o resultado da câmera, históricos e insights de forma dinâmica por qualquer lugar do mundo." |
+| **Trechos ou entregas afetadas** | Entregáveis de Sistemas Embarcados e Projeto Interdisciplinar |
 
 
 
 ### Sistemas Embarcados e Robótica
 
-| **Aluno(s) Responsável(veis)** |[preencher] |
+| **Aluno(s) Responsável(veis)** | Bernardo Seijas Cavalcante |
 | :--- | :--- |
-| **Ferramenta utilizada** | [preencher] |
-| **Versão/modelo** | [preencher] |
-| **Disciplina / Trabalho** | [preencher] |
-| **Finalidade de uso** | [preencher] |
-| ***Prompts* principais utilizados** | [preencher] |
-| **Trechos ou entregas afetadas** | [preencher] |
+| **Ferramenta utilizada** | Gemini |
+| **Versão/modelo** | Gemini 3.8 Flash |
+| **Disciplina / Trabalho** | Sistemas Embarcados |
+| **Finalidade de uso** | Utilizamos o Antigravity para a construção do protótipo |
+| ***Prompts* principais utilizados** | "Como realizamos uma comunicação entre este script Python e um Arduino para fazer com que Leds (pontos no corpo da pessoa) acendam quando houver algo de errado na movimentação daquela parte do corpo"; "Preciso de um exemplo de circuito de áudio classe A com alimentação de 24V de entrada para um alto-falante de 8 Ohms e 10W com TIP-41C e levando em consideração que o resistor de maior potência que tenho tem 10W e 10 Ohms." |
+| **Trechos ou entregas afetadas** | Entregáveis de Sistemas Embarcados e Projeto Interdisciplinar |
 
 ### Teoria da Computação e Linguagens Formais
 

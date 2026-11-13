@@ -1,17 +1,17 @@
 {
-  "xp": 91339,
+  "xp": 99763,
   "level": 5,
   "rank_title": "Grand Slam Master",
   "best_rally": 43,
-  "total_strokes": 4,
-  "successful_strokes": 3,
+  "total_strokes": 1,
+  "successful_strokes": 1,
   "unlocked_achievements": [
-    "MURALHA",
-    "SUBINDO_DE_NIVEL",
-    "COMBO_3X",
     "PRIMEIRO_RALLY",
+    "COMBO_3X",
+    "MURALHA",
     "PERFEICAO",
-    "COMBO_MASTER"
+    "COMBO_MASTER",
+    "SUBINDO_DE_NIVEL"
   ],
-  "last_updated": 1794196411.0973823
+  "last_updated": 102.21
 }

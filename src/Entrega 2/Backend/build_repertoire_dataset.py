@@ -110,37 +110,53 @@ def generate_synthetic_resting_windows(num_windows: int = 150) -> list:
             pose[25] = [0.04, 0.35, 0.0]; pose[26] = [-0.04, 0.35, 0.0]
             pose[27] = [0.04, 0.70, 0.0]; pose[28] = [-0.04, 0.70, 0.0]
         elif style == 1:
-            # 2. Sentado à mesa: mãos à frente (digitando/repousando na mesa)
-            pose[13] = [0.07, -0.12, 0.08]
-            pose[14] = [-0.07, -0.12, 0.08]
-            pose[15] = [0.04, -0.04, 0.22]
-            pose[16] = [-0.04, -0.04, 0.22]
+            # 2. Sentado à mesa: mãos à frente (no MediaPipe, Z negativo aponta para a câmera)
+            pose[13] = [0.07, -0.12, -0.18]
+            pose[14] = [-0.07, -0.12, -0.18]
+            pose[15] = [0.04, -0.04, -0.34]
+            pose[16] = [-0.04, -0.04, -0.34]
             # Pernas dobradas como sentado
-            pose[25] = [0.05, 0.15, 0.30]; pose[26] = [-0.05, 0.15, 0.30]
-            pose[27] = [0.05, 0.45, 0.30]; pose[28] = [-0.05, 0.45, 0.30]
+            pose[25] = [0.05, 0.08, -0.25]; pose[26] = [-0.05, 0.08, -0.25]
+            pose[27] = [0.05, 0.40, -0.20]; pose[28] = [-0.05, 0.40, -0.20]
         elif style == 2:
-            # 3. Ready position de tênis (mãos juntas segurando o cabo da raquete na cintura)
-            pose[13] = [0.08, -0.13, 0.12]
-            pose[14] = [-0.08, -0.13, 0.12]
-            pose[15] = [0.02, -0.02, 0.20]
-            pose[16] = [-0.02, -0.02, 0.20]
-            pose[25] = [0.05, 0.30, 0.05]; pose[26] = [-0.05, 0.30, 0.05]
-            pose[27] = [0.05, 0.65, 0.0]; pose[28] = [-0.05, 0.65, 0.0]
+            # 3. Ready position de tênis (mãos juntas segurando a raquete à frente da cintura)
+            pose[13] = [0.08, -0.12, -0.16]
+            pose[14] = [-0.08, -0.12, -0.16]
+            pose[15] = [0.02, -0.04, -0.32]
+            pose[16] = [-0.02, -0.04, -0.32]
+            pose[25] = [0.05, 0.30, -0.05]; pose[26] = [-0.05, 0.30, -0.05]
+            pose[27] = [0.05, 0.65, 0.15]; pose[28] = [-0.05, 0.65, 0.15]
         else:
-            # 4. De pé casual: uma mão no bolso/cintura e outra relaxada
+            # 4. De pé casual: uma mão na cintura e outra relaxada
             pose[13] = [0.08, -0.10, -0.05]
-            pose[14] = [-0.10, -0.12, 0.05]
-            pose[15] = [0.08, 0.04, -0.10]
-            pose[16] = [-0.06, -0.02, 0.02]
+            pose[14] = [-0.10, -0.12, -0.10]
+            pose[15] = [0.08, 0.04, -0.12]
+            pose[16] = [-0.05, -0.02, -0.14]
             pose[25] = [0.04, 0.35, 0.0]; pose[26] = [-0.04, 0.35, 0.0]
-            pose[27] = [0.04, 0.70, 0.0]; pose[28] = [-0.04, 0.70, 0.0]
+            pose[27] = [0.04, 0.70, 0.12]; pose[28] = [-0.04, 0.70, 0.12]
 
-        # Normaliza escala para ombros ~0.40
-        pose = pose * (0.40 / 0.14) * scale
+        # Pontos faciais coerentes com o nariz e pés coerentes com os tornozelos
+        for idx in range(1, 11):
+            offset_x = 0.015 if idx in (1, 2, 3, 7, 9) else -0.015
+            offset_y = -0.02 if idx <= 6 else (0.0 if idx <= 8 else 0.025)
+            pose[idx] = pose[0] + np.array([offset_x, offset_y, 0.02], dtype=np.float32)
+
+        pose[29] = pose[27] + np.array([0.0, 0.025, 0.025], dtype=np.float32)
+        pose[31] = pose[27] + np.array([0.0, 0.035, -0.045], dtype=np.float32)
+        pose[30] = pose[28] + np.array([0.0, 0.025, 0.025], dtype=np.float32)
+        pose[32] = pose[28] + np.array([0.0, 0.035, -0.045], dtype=np.float32)
+
+        # Variação anatômica sutil de altura antes da normalização invariante pelo esterno
+        pose[:, 1] *= scale
 
         # Fixa os dedos nos pulsos
         for wrist_idx, finger_indices in [(15, [17, 19, 21]), (16, [18, 20, 22])]:
             pose[finger_indices] = pose[wrist_idx]
+
+        # Centraliza no esterno e normaliza largura dos ombros para 0.40 (idêntico a process_landmarks_to_tensor)
+        sh_mid = (pose[11] + pose[12]) / 2.0
+        sh_dist = max(0.04, float(np.linalg.norm(pose[11] - pose[12])))
+        pose = (pose - sh_mid) * (0.40 / sh_dist)
 
         seq = np.zeros((60, 33, 3), dtype=np.float32)
         breath_freq = rng.uniform(0.15, 0.30)
@@ -150,10 +166,14 @@ def generate_synthetic_resting_windows(num_windows: int = 150) -> list:
             breath = 0.005 * np.sin(2 * np.pi * breath_freq * (t / 30.0))
             sway = 0.006 * np.sin(2 * np.pi * sway_freq * (t / 30.0))
             frame_pose = pose.copy()
-            frame_pose[:, 0] += sway
+            # Oscilação relativa dos membros e quadris preservando o esterno centrado após re-normalização
+            frame_pose[15:, 0] += sway
             frame_pose[[0, 11, 12, 13, 14], 1] += breath
             noise = rng.normal(0, 0.003, size=(33, 3)).astype(np.float32)
-            seq[t] = frame_pose + noise
+            frame_pose = frame_pose + noise
+            f_mid = (frame_pose[11] + frame_pose[12]) / 2.0
+            f_dist = max(0.04, float(np.linalg.norm(frame_pose[11] - frame_pose[12])))
+            seq[t] = (frame_pose - f_mid) * (0.40 / f_dist)
 
         windows.append(seq)
 

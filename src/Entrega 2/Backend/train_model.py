@@ -57,20 +57,46 @@ class TennisPoseDataset(Dataset):
         return torch.tensor(sample, dtype=torch.float32), torch.tensor(label, dtype=torch.long)
 
 
-def split_train_val(X: np.ndarray, y: np.ndarray, val_ratio: float = 0.2, seed: int = 42):
+def split_train_val(X: np.ndarray, y: np.ndarray, val_ratio: float = 0.2, seed: int = 42, sources: np.ndarray = None):
     """
-    Divide o dataset de forma estratificada por classe entre treino e validação.
+    Divide o dataset entre treino e validação de forma estratificada.
+    Quando `sources` está disponível, agrupa pelo vídeo-fonte base (sem sufixo `#mirror`)
+    para impedir vazamento de janelas sobrepostas ou espelhadas entre treino e validação.
     """
     rng = np.random.default_rng(seed)
     train_indices = []
     val_indices = []
 
-    for cid in np.unique(y):
-        cls_idx = np.where(y == cid)[0]
-        rng.shuffle(cls_idx)
-        n_val = max(1, int(len(cls_idx) * val_ratio)) if len(cls_idx) >= 4 else 0
-        val_indices.extend(cls_idx[:n_val])
-        train_indices.extend(cls_idx[n_val:])
+    if sources is not None and len(sources) == len(y):
+        groups = {}
+        group_primary_cls = {}
+        for idx, (src, cls_id) in enumerate(zip(sources, y)):
+            src_str = str(src)
+            base_src = src_str.split("#", 1)[0]
+            groups.setdefault(base_src, []).append(idx)
+            # Prioriza o rótulo do vídeo original (sem #mirror) para estratificação do grupo
+            if base_src not in group_primary_cls or "#mirror" not in src_str:
+                group_primary_cls[base_src] = int(cls_id)
+
+        cls_to_groups = {}
+        for base_src, primary_cls in group_primary_cls.items():
+            cls_to_groups.setdefault(primary_cls, []).append(base_src)
+
+        for cid in sorted(cls_to_groups.keys()):
+            grp_list = sorted(cls_to_groups[cid])
+            rng.shuffle(grp_list)
+            n_val = max(1, int(len(grp_list) * val_ratio)) if len(grp_list) >= 4 else 0
+            for base_src in grp_list[:n_val]:
+                val_indices.extend(groups[base_src])
+            for base_src in grp_list[n_val:]:
+                train_indices.extend(groups[base_src])
+    else:
+        for cid in np.unique(y):
+            cls_idx = np.where(y == cid)[0]
+            rng.shuffle(cls_idx)
+            n_val = max(1, int(len(cls_idx) * val_ratio)) if len(cls_idx) >= 4 else 0
+            val_indices.extend(cls_idx[:n_val])
+            train_indices.extend(cls_idx[n_val:])
 
     train_indices = np.array(train_indices, dtype=np.int64)
     val_indices = np.array(val_indices, dtype=np.int64)
@@ -99,6 +125,7 @@ def main():
                         help="Executa um treino rápido com dados sintéticos para validar todo o pipeline.")
     args = parser.parse_args()
 
+    sources = None
     if args.synthetic_demo:
         print("[MODO DEMO] Gerando dados sintéticos (80 amostras, 4 classes) para validar o pipeline...")
         rng = np.random.default_rng(42)
@@ -115,13 +142,15 @@ def main():
 
         loaded = np.load(args.data, allow_pickle=True)
         X, y = loaded["X"], loaded["y"]
+        sources = loaded["sources"] if "sources" in loaded else None
+
 
     print("=" * 65)
     print(" TENNISSYNC - TREINAMENTO DO MODELO TENNISTRANSFORMER")
     print("=" * 65)
     print(f" Total de amostras : {len(y)} | Shape: {X.shape}")
 
-    (X_train, y_train), (X_val, y_val) = split_train_val(X, y, val_ratio=0.2)
+    (X_train, y_train), (X_val, y_val) = split_train_val(X, y, val_ratio=0.2, sources=sources)
     print(f" Amostras Treino   : {len(y_train)} | Validação: {len(y_val)}")
 
     device = "cuda" if torch.cuda.is_available() else "cpu"

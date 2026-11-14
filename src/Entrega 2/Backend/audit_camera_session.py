@@ -1,3 +1,4 @@
+from camera_utils import get_usb_camera_source, is_camera_blacklisted
 """
 TenniSync - Módulo de Sessão de Auditoria Guiada, Qualificação Biomecânica e Treinamento
 Permite executar movimentos com a câmera, acendimento em tempo real de LEDs no Arduino Uno (COM4),
@@ -55,7 +56,7 @@ def request_server_camera_resume():
 
 class AuditCameraSession:
     def __init__(self, source="0", lateralidade="destro", arduino_port="COM4"):
-        self.source = source
+        self.source = str(get_usb_camera_source(source))
         self.lateralidade = lateralidade
         self.arduino_port = arduino_port
         
@@ -701,7 +702,7 @@ class AuditCameraSession:
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="TenniSync - Sessão de Auditoria Guiada e Treinamento")
-    parser.add_argument("--source", type=str, default="0", help="Índice da câmera (padrão: 0)")
+    parser.add_argument("--source", type=str, default=None, help="Índice da câmera (padrão: 0)")
     parser.add_argument("--lateralidade", type=str, default="destro", choices=["destro", "canhoto"], help="Lateralidade do atleta")
     parser.add_argument("--arduino_port", type=str, default="COM4", help="Porta serial do Arduino Uno (padrão: COM4)")
     args = parser.parse_args()

@@ -170,7 +170,8 @@ vite.config.ts.timestamp-*
 .vite/
 
 # TennisSync - Dataset de Vídeos e Pesos de Treinamento
-*.mp4
+src/Entrega 2/Backend/replays/
+
 *.avi
 *.mov
 *.mkv

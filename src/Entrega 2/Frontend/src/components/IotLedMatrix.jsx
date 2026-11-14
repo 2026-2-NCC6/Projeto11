@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Cpu, Radio, CheckCircle, AlertTriangle, Sparkles, Activity } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Cpu, Radio, CheckCircle, AlertTriangle, Sparkles, Activity, Zap, RefreshCw, Power } from 'lucide-react';
+import authClient from '../utils/authClient';
 
 // Mapeamento idêntico ao firmware_leds.ino e pose_estimation.py
 const LED_DEFINITIONS = [
@@ -19,7 +20,81 @@ const LED_DEFINITIONS = [
 
 export function IotLedMatrix({ failedJoints = [], isConnected = false, compact = false }) {
   const [selectedJoint, setSelectedJoint] = useState(null);
-  const isAnyLedActive = failedJoints && failedJoints.length > 0;
+  const [hwStatus, setHwStatus] = useState({ is_connected: false, port: 'COM4', active_joints: [] });
+  const [isOperating, setIsOperating] = useState(false);
+
+  // Consulta o status real da porta Serial do Arduino periodicamente
+  useEffect(() => {
+    let unmounted = false;
+    const fetchIotStatus = async () => {
+      try {
+        const res = await fetch('/api/iot/status');
+        if (res.ok) {
+          const data = await res.json();
+          if (!unmounted) setHwStatus(data);
+        }
+      } catch {}
+    };
+
+    fetchIotStatus();
+    const interval = setInterval(fetchIotStatus, 3000);
+    return () => {
+      unmounted = true;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Mescla falhas da telemetria com acionamentos manuais
+  const activeSet = new Set([...(failedJoints || []), ...(hwStatus.active_joints || [])]);
+  const isAnyLedActive = activeSet.size > 0;
+
+  // Dispara acendimento ou desligamento individual do LED no Arduino
+  const handleToggleLed = async (led) => {
+    setIsOperating(true);
+    try {
+      const res = await authClient.fetchWithAuth('/api/iot/leds/control', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ byte: led.byte, action: 'toggle' })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setHwStatus(updated);
+      }
+    } catch (e) {
+      console.warn('Erro ao controlar LED do Arduino:', e);
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
+  // Executa teste de bancada varrendo os 12 atuadores
+  const handleSweepTest = async () => {
+    setIsOperating(true);
+    try {
+      await authClient.fetchWithAuth('/api/iot/leds/sweep', { method: 'POST' });
+    } catch (e) {
+      console.warn('Erro ao disparar varredura:', e);
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
+  // Apaga todos os LEDs e devolve o controle à IA
+  const handleResetLeds = async () => {
+    setIsOperating(true);
+    try {
+      const res = await authClient.fetchWithAuth('/api/iot/leds/reset', { method: 'POST' });
+      if (res.ok) {
+        const updated = await res.json();
+        setHwStatus(updated);
+      }
+    } catch (e) {
+      console.warn('Erro ao resetar LEDs:', e);
+    } finally {
+      setIsOperating(false);
+    }
+  };
 
   return (
     <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
@@ -29,18 +104,43 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Cpu size={18} color="#f59e0b" />
           <h3 style={{ fontSize: '0.85rem', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#f8fafc', margin: 0 }}>
-            Colete IoT - Corpo Virtual com 12 LEDs
+            Colete IoT - Controle de Atuadores
           </h3>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span className={`badge ${isConnected ? 'badge-green' : 'badge-amber'}`} style={{ fontSize: '0.65rem' }}>
-            {isConnected ? '● Arduino COM4 Conectado' : '● Simulação Virtual Ativa'}
+          <span className={`badge ${hwStatus.is_connected ? 'badge-green' : 'badge-amber'}`} style={{ fontSize: '0.65rem' }}>
+            {hwStatus.is_connected ? `● Arduino ${hwStatus.port} Conectado` : '● Simulação Virtual'}
           </span>
         </div>
       </div>
 
+      {/* Barra de Ações Rápidas (Varredura e Reset Geral) */}
+      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <button
+          onClick={handleSweepTest}
+          disabled={isOperating}
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+          title="Aciona sequencialmente os 12 LEDs para teste físico de bancada"
+        >
+          <Zap size={13} color="#f59e0b" />
+          <span>Testar Varredura</span>
+        </button>
+
+        <button
+          onClick={handleResetLeds}
+          disabled={isOperating}
+          className="btn btn-secondary"
+          style={{ flex: 1, padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+          title="Envia comando 'R' para apagar todos os LEDs físicos"
+        >
+          <RefreshCw size={13} color="#f87171" />
+          <span>Apagar Todos ('R')</span>
+        </button>
+      </div>
+
       <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: 0 }}>
-        Visualização anatômica em tempo real dos 12 atuadores do protótipo (Portas digitais 2 a 13 do Arduino Uno).
+        Clique em qualquer articulação do corpo virtual para ligar ou desligar o LED físico correspondente no Arduino.
       </p>
 
       {/* ÁREA CENTRAL: CORPO ANATÔMICO COM OS 12 LEDS */}
@@ -63,13 +163,11 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
           style={{ width: '100%', height: '100%', maxHeight: '340px' }}
         >
           <defs>
-            {/* Brilho Vermelho Neon para LED Ativo */}
             <filter id="neon-glow-red" x="-50%" y="-50%" width="200%" height="200%">
               <feDropShadow dx="0" dy="0" stdDeviation="4" floodColor="#ef4444" floodOpacity="0.9" />
               <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#dc2626" floodOpacity="0.6" />
             </filter>
             
-            {/* Brilho Verde/Ciano para LED em Repouso */}
             <filter id="neon-glow-green" x="-30%" y="-30%" width="160%" height="160%">
               <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#10b981" floodOpacity="0.5" />
             </filter>
@@ -77,45 +175,30 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
 
           {/* Silhueta Anatômica: Linhas Conectivas / Esqueleto */}
           <g stroke="rgba(100, 116, 139, 0.4)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            {/* Cabeça */}
             <circle cx="140" cy="32" r="15" fill="rgba(30, 41, 59, 0.8)" stroke="#38bdf8" strokeWidth="2" />
-            
-            {/* Pescoço & Coluna */}
             <line x1="140" y1="47" x2="140" y2="72" />
             <line x1="140" y1="72" x2="140" y2="168" strokeDasharray="3,3" />
-
-            {/* Barra dos Ombros */}
             <line x1="88" y1="72" x2="192" y2="72" />
-
-            {/* Braço Direito (Perspectiva da tela: esquerda = lado direito do atleta) */}
             <line x1="88" y1="72" x2="62" y2="125" />
             <line x1="62" y1="125" x2="42" y2="178" />
-
-            {/* Braço Esquerdo */}
             <line x1="192" y1="72" x2="218" y2="125" />
             <line x1="218" y1="125" x2="238" y2="178" />
-
-            {/* Barra do Quadril */}
             <line x1="110" y1="168" x2="170" y2="168" />
-
-            {/* Perna Direita */}
             <line x1="110" y1="168" x2="106" y2="235" />
             <line x1="106" y1="235" x2="102" y2="295" />
-
-            {/* Perna Esquerda */}
             <line x1="170" y1="168" x2="174" y2="235" />
             <line x1="174" y1="235" x2="178" y2="295" />
           </g>
 
           {/* Renderização dos 12 LEDs Interativos */}
           {LED_DEFINITIONS.map((led) => {
-            const isActive = failedJoints.includes(led.id);
+            const isActive = activeSet.has(led.id);
 
             return (
               <g 
                 key={led.id} 
                 style={{ cursor: 'pointer', transition: 'all 0.2s' }}
-                onClick={() => setSelectedJoint(led)}
+                onClick={() => handleToggleLed(led)}
               >
                 {/* Halo pulsante quando ativo */}
                 {isActive && (
@@ -157,7 +240,7 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
                   {led.byte}
                 </text>
 
-                {/* Rótulo da Articulação (ao lado do LED) */}
+                {/* Rótulo da Articulação */}
                 <text
                   x={led.side === 'right' ? led.x - 12 : led.x + 12}
                   y={led.y + 3}
@@ -197,35 +280,37 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
             )}
             <span style={{ fontSize: '0.72rem', fontWeight: '700', color: isAnyLedActive ? '#fca5a5' : '#6ee7b7' }}>
               {isAnyLedActive 
-                ? `LEDs Ativos: ${LED_DEFINITIONS.filter(l => failedJoints.includes(l.id)).map(l => `${l.label} [${l.byte}]`).join(', ')}`
+                ? `LEDs Ativos: ${LED_DEFINITIONS.filter(l => activeSet.has(l.id)).map(l => `${l.label} [${l.byte}]`).join(', ')}`
                 : 'Trajetória Correta: Todos os 12 LEDs apagados'}
             </span>
           </div>
 
           <span style={{ fontSize: '0.65rem', color: '#cbd5e1', fontFamily: 'monospace' }}>
-            {isAnyLedActive ? 'Hardware Buzzer ON' : 'Reset [Byte R]'}
+            {isAnyLedActive ? 'Buzzer / Sinal Ativo' : 'Reset [Byte R]'}
           </span>
         </div>
 
       </div>
 
-      {/* Lista Compacta de Portas Digitais */}
+      {/* Lista Compacta de Portas Digitais Interativas */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: compact ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)',
         gap: '6px'
       }}>
         {LED_DEFINITIONS.map(led => {
-          const isActive = failedJoints.includes(led.id);
+          const isActive = activeSet.has(led.id);
           return (
-            <div
+            <button
               key={led.id}
+              onClick={() => handleToggleLed(led)}
               style={{
                 background: isActive ? 'rgba(239, 68, 68, 0.2)' : 'rgba(15, 23, 42, 0.5)',
-                border: `1px solid ${isActive ? '#ef4444' : 'rgba(255, 255, 255, 0.06)'}`,
+                border: `1px solid ${isActive ? '#ef4444' : 'rgba(255, 255, 255, 0.08)'}`,
                 borderRadius: '6px',
-                padding: '4px 6px',
+                padding: '5px 6px',
                 textAlign: 'center',
+                cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
             >
@@ -235,7 +320,7 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
               <div style={{ fontSize: '0.58rem', color: isActive ? '#fca5a5' : '#94a3b8', whiteSpace: 'nowrap' }}>
                 {led.label}
               </div>
-            </div>
+            </button>
           );
         })}
       </div>
@@ -243,3 +328,5 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
     </div>
   );
 }
+
+export default IotLedMatrix;

@@ -9,3 +9,7 @@ sounddevice>=0.4.6
 fastapi>=0.115.0
 uvicorn>=0.34.0
 websockets>=13.0
+aiortc>=1.16.0
+av>=14.0.0
+pyjwt>=2.15.0
+cryptography>=42.0.0

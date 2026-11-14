@@ -74,11 +74,19 @@ void loop() {
       return;
     }
 
+    // Comando Maiúsculo ('A'-'L'): Acende LED específico e toca Buzzer
     if (comando >= 'A' && comando <= 'L') {
       int indice = comando - 'A';
       digitalWrite(pinosLeds[indice], HIGH);
       tone(buzzerPin, 1000, 150);
-      Serial.print("Erro em: ");
+      Serial.print("Erro/Ativado em: ");
+      Serial.println(nomesArticulacoes[indice]);
+    }
+    // Comando Minúsculo ('a'-'l'): Apaga LED individual sem afetar os demais
+    else if (comando >= 'a' && comando <= 'l') {
+      int indice = comando - 'a';
+      digitalWrite(pinosLeds[indice], LOW);
+      Serial.print("Apagado: ");
       Serial.println(nomesArticulacoes[indice]);
     } else {
       Serial.println("Comando invalido");

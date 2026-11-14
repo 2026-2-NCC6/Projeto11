@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTennisSync } from './hooks/useTennisSync';
 import { Navbar } from './components/Navbar';
 import { VideoFeed } from './components/VideoFeed';
@@ -9,6 +9,8 @@ import { IotLedMatrix } from './components/IotLedMatrix';
 import { PerformanceStats } from './components/PerformanceStats';
 import { HistoryLog } from './components/HistoryLog';
 import { RallyGameCard } from './components/RallyGameCard';
+import { LoginModal } from './components/LoginModal';
+import authClient from './utils/authClient';
 import logger from './utils/logger';
 
 class DiagnosticErrorBoundary extends React.Component {
@@ -140,9 +142,19 @@ function MainDashboard() {
 
   // Modos de layout: 'fullscreen' (câmera cheia), 'split_iot' (3/4 câmera + 1/4 IoT), 'dashboard' (clássico)
   const [viewMode, setViewMode] = useState('split_iot');
+  const [isAuthenticated, setIsAuthenticated] = useState(authClient.isAuthenticated());
+
+  useEffect(() => {
+    const handleUnauthorized = () => setIsAuthenticated(false);
+    window.addEventListener('tennisync:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('tennisync:unauthorized', handleUnauthorized);
+  }, []);
 
   return (
     <div style={{ maxWidth: '1440px', margin: '0 auto', padding: '20px 24px 40px 24px' }}>
+      {!isAuthenticated && (
+        <LoginModal onLoginSuccess={() => setIsAuthenticated(true)} />
+      )}
       
       {/* Barra de Navegação com Seletor de Visões e Controles */}
       <Navbar

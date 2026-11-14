@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Camera, Zap, AlertCircle, Moon, UserCheck, UserX, RefreshCw } from 'lucide-react';
+import { Camera, Zap, AlertCircle, Moon, UserCheck, UserX, RefreshCw, Radio, Wifi } from 'lucide-react';
 import { TennisGameCourtOverlay } from './TennisGameCourtOverlay';
 import logger from '../utils/logger';
+import authClient from '../utils/authClient';
 
 // Conexões anatômicas padrão do MediaPipe Pose
 const POSE_CONNECTIONS = [
@@ -32,8 +33,9 @@ export function VideoFeed({
   onResetGame,
   containerHeight = '460px'
 }) {
-  const [useLocalCamera, setUseLocalCamera] = useState(false);
+  const [useLocalCamera, setUseLocalCamera] = useState(true);
   const [cameraReady, setCameraReady] = useState(false);
+  const [transportProtocol, setTransportProtocol] = useState('Iniciando...');
   const [streamError, setStreamError] = useState(null);
   const [streamKey, setStreamKey] = useState(Date.now());
 
@@ -111,12 +113,15 @@ export function VideoFeed({
     if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
   }, []);
 
-  // Efeito principal: Gerenciamento da Webcam e Streaming WebSocket /ws/video
+  // Efeito principal: Gerenciamento da Webcam e Streaming via protocolo UDP (WebRTC) com Fallback WSS
   useEffect(() => {
     let unmounted = false;
     let stream = null;
+    let pc = null;
+    let dc = null;
     let ws = null;
     let frameInterval = null;
+    let rtcTimeout = null;
 
     if (!useLocalCamera) {
       setCameraReady(false);
@@ -132,51 +137,49 @@ export function VideoFeed({
       offscreenCanvasRef.current = off;
     }
 
-    // 1. Conecta WebSocket de vídeo
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname || 'localhost';
-    const wsVideoUrl = `${protocol}//${host}:8000/ws/video`;
+    const startWebSocketFallback = () => {
+      if (unmounted || ws) return;
+      setTransportProtocol('WSS (Fallback)');
+      const wsVideoUrl = authClient.getWsUrl('/ws/video');
+      logger.info('WEBSOCKET', 'Iniciando canal WebSocket de vídeo como fallback:', wsVideoUrl);
 
-    try {
-      ws = new WebSocket(wsVideoUrl);
-      wsVideoRef.current = ws;
+      try {
+        ws = new WebSocket(wsVideoUrl);
+        ws.onopen = () => {
+          if (unmounted) return;
+          logger.info('WEBSOCKET', 'Canal WebSocket de vídeo (/ws/video) pronto.');
+        };
 
-      ws.onopen = () => {
-        if (unmounted) return;
-        logger.info('WEBSOCKET', 'Canal de vídeo WebSocket (/ws/video) pronto.');
-      };
-
-      ws.onmessage = (event) => {
-        if (unmounted) return;
-        isSendingFrameRef.current = false;
-        try {
-          const telemetryData = JSON.parse(event.data);
-          if (onTelemetryUpdate) {
-            onTelemetryUpdate(telemetryData);
+        ws.onmessage = (event) => {
+          if (unmounted) return;
+          isSendingFrameRef.current = false;
+          try {
+            const telemetryData = JSON.parse(event.data);
+            if (onTelemetryUpdate) onTelemetryUpdate(telemetryData);
+            if (telemetryData.landmarks) {
+              renderSkeletonOverlay(telemetryData.landmarks, telemetryData.failed_joints || []);
+            } else {
+              clearSkeletonOverlay();
+            }
+          } catch (e) {
+            logger.error('WEBSOCKET', 'Erro ao processar telemetria recebida:', e);
           }
-          if (telemetryData.landmarks) {
-            renderSkeletonOverlay(telemetryData.landmarks, telemetryData.failed_joints || []);
-          } else {
-            clearSkeletonOverlay();
-          }
-        } catch (e) {
-          logger.error('WEBSOCKET', 'Erro ao processar telemetria de vídeo recebida:', e);
-        }
-      };
+        };
 
-      ws.onerror = (e) => {
-        logger.warn('WEBSOCKET', 'Erro no canal WebSocket de vídeo (/ws/video):', e);
-        isSendingFrameRef.current = false;
-      };
+        ws.onerror = (e) => {
+          logger.warn('WEBSOCKET', 'Erro no canal WebSocket de vídeo:', e);
+          isSendingFrameRef.current = false;
+        };
 
-      ws.onclose = () => {
-        isSendingFrameRef.current = false;
-      };
-    } catch (e) {
-      logger.error('WEBSOCKET', 'Falha ao instanciar WebSocket /ws/video:', e);
-    }
+        ws.onclose = () => {
+          isSendingFrameRef.current = false;
+        };
+      } catch (e) {
+        logger.error('WEBSOCKET', 'Falha ao instanciar WebSocket /ws/video:', e);
+      }
+    };
 
-    // 2. Abre a câmera do navegador via getUserMedia
+    // Abre a câmera do navegador via getUserMedia
     navigator.mediaDevices.getUserMedia({
       video: {
         width: { ideal: 640 },
@@ -185,13 +188,14 @@ export function VideoFeed({
       },
       audio: false
     })
-      .then((s) => {
+      .then(async (s) => {
         if (unmounted) {
           s.getTracks().forEach(t => t.stop());
           return;
         }
         stream = s;
         streamRef.current = s;
+
         if (videoRef.current) {
           videoRef.current.srcObject = s;
           videoRef.current.onloadedmetadata = () => {
@@ -199,33 +203,151 @@ export function VideoFeed({
             videoRef.current.play().catch(() => {});
             setCameraReady(true);
             setStreamError(null);
-            logger.info('CAM/STREAM', 'Webcam do navegador iniciada e transmitindo a 30 FPS.');
+
+            // Preservação de proporção anatômica (Aspect Ratio)
+            const vw = videoRef.current.videoWidth || 640;
+            const vh = videoRef.current.videoHeight || 480;
+            if (overlayCanvasRef.current) {
+              overlayCanvasRef.current.width = vw;
+              overlayCanvasRef.current.height = vh;
+            }
+            if (offscreenCanvasRef.current) {
+              let targetW = 640;
+              let targetH = Math.round((vh / vw) * 640);
+              if (vh > vw) {
+                targetH = 640;
+                targetW = Math.round((vw / vh) * 640);
+              }
+              offscreenCanvasRef.current.width = targetW;
+              offscreenCanvasRef.current.height = targetH;
+            }
+
+            logger.info('CAM/STREAM', `Webcam iniciada: ${vw}x${vh} @ 30 FPS.`);
           };
         }
 
-        // 3. Loop de captura e envio de frames a ~25 FPS
+        // ==============================================================================
+        // INICIA SESSÃO WEBRTC VIA PROTOCOLO UDP
+        // ==============================================================================
+        try {
+          setTransportProtocol('Negociando UDP...');
+          const iceRes = await authClient.fetchWithAuth('/api/webrtc/ice_servers').catch(() => null);
+          const iceData = iceRes && iceRes.ok ? await iceRes.json().catch(() => null) : null;
+          const rtcConfig = iceData || {
+            iceServers: [
+              { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+              { urls: ['stun:stun2.l.google.com:19302', 'stun:stun.cloudflare.com:3478'] }
+            ]
+          };
+
+          pc = new RTCPeerConnection(rtcConfig);
+
+          // Adiciona o track de vídeo para streaming UDP nativo (SRTP)
+          s.getTracks().forEach(track => pc.addTrack(track, s));
+
+          // Cria canal de dados UDP sem retransmissão para baixa latência
+          dc = pc.createDataChannel('udp-telemetry', { ordered: false, maxRetransmits: 0 });
+          dc.onopen = () => {
+            if (unmounted) return;
+            setTransportProtocol('UDP (WebRTC)');
+            logger.info('WEBRTC/UDP', 'Canal de dados UDP DataChannel pronto.');
+          };
+
+          dc.onmessage = (event) => {
+            if (unmounted) return;
+            isSendingFrameRef.current = false;
+            try {
+              const telemetryData = JSON.parse(event.data);
+              if (onTelemetryUpdate) onTelemetryUpdate(telemetryData);
+              if (telemetryData.landmarks) {
+                renderSkeletonOverlay(telemetryData.landmarks, telemetryData.failed_joints || []);
+              } else {
+                clearSkeletonOverlay();
+              }
+            } catch (e) {
+              logger.error('WEBRTC/UDP', 'Erro ao decodificar telemetria UDP:', e);
+            }
+          };
+
+          pc.oniceconnectionstatechange = () => {
+            if (unmounted) return;
+            logger.info('WEBRTC/UDP', `Estado ICE WebRTC: ${pc.iceConnectionState}`);
+            if (['connected', 'completed'].includes(pc.iceConnectionState)) {
+              setTransportProtocol('UDP (WebRTC)');
+            } else if (pc.iceConnectionState === 'failed') {
+              startWebSocketFallback();
+            }
+          };
+
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+
+          // Aguarda reunião inicial de candidatos STUN
+          await new Promise((resolve) => {
+            if (pc.iceGatheringState === 'complete') {
+              resolve();
+            } else {
+              const checkState = () => {
+                if (pc.iceGatheringState === 'complete') {
+                  pc.removeEventListener('icegatheringstatechange', checkState);
+                  resolve();
+                }
+              };
+              pc.addEventListener('icegatheringstatechange', checkState);
+              setTimeout(resolve, 800);
+            }
+          });
+
+          const offerRes = await authClient.fetchWithAuth('/api/webrtc/offer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sdp: pc.localDescription.sdp, type: pc.localDescription.type })
+          });
+
+          if (!offerRes.ok) throw new Error('Servidor recusou oferta SDP');
+          const answer = await offerRes.json();
+          await pc.setRemoteDescription(new RTCSessionDescription(answer));
+          setTransportProtocol('UDP (WebRTC)');
+          logger.info('WEBRTC/UDP', 'Sessão WebRTC UDP estabelecida com sucesso.');
+        } catch (err) {
+          logger.warn('WEBRTC/UDP', 'WebRTC UDP bloqueado ou indisponível. Ativando fallback WebSocket:', err);
+          startWebSocketFallback();
+        }
+
+        // Watchdog de 4.5s para fallback automático
+        rtcTimeout = setTimeout(() => {
+          if (!unmounted && (!pc || !['connected', 'completed'].includes(pc.iceConnectionState))) {
+            logger.warn('WEBRTC/UDP', 'Timeout na negociação ICE UDP. Chaveando para fallback.');
+            startWebSocketFallback();
+          }
+        }, 4500);
+
+        // Loop contínuo de captura e envio de frames a ~25 FPS
         frameInterval = setInterval(() => {
           if (unmounted) return;
           const video = videoRef.current;
           const offscreen = offscreenCanvasRef.current;
-          const activeWs = wsVideoRef.current;
+          const isDcOpen = dc && dc.readyState === 'open';
+          const isWsOpen = ws && ws.readyState === WebSocket.OPEN;
 
-          if (
-            video &&
-            video.readyState >= 2 &&
-            offscreen &&
-            activeWs &&
-            activeWs.readyState === WebSocket.OPEN &&
-            !isSendingFrameRef.current
-          ) {
+          if (video && video.readyState >= 2 && offscreen && (isDcOpen || isWsOpen) && !isSendingFrameRef.current) {
             isSendingFrameRef.current = true;
             const ctx = offscreen.getContext('2d');
-            ctx.drawImage(video, 0, 0, 640, 480);
+            ctx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
 
             offscreen.toBlob((blob) => {
               if (unmounted) return;
-              if (blob && activeWs.readyState === WebSocket.OPEN) {
-                activeWs.send(blob);
+              if (blob) {
+                if (isDcOpen) {
+                  blob.arrayBuffer().then(buf => {
+                    if (dc.readyState === 'open') dc.send(buf);
+                    else isSendingFrameRef.current = false;
+                  }).catch(() => { isSendingFrameRef.current = false; });
+                } else if (isWsOpen) {
+                  ws.send(blob);
+                } else {
+                  isSendingFrameRef.current = false;
+                }
               } else {
                 isSendingFrameRef.current = false;
               }
@@ -237,17 +359,23 @@ export function VideoFeed({
         if (unmounted) return;
         logger.error('CAM/STREAM', 'Câmera local indisponível no navegador:', err);
         setStreamError('Câmera indisponível no navegador. Verifique permissões.');
-        setUseLocalCamera(false);
       });
 
     return () => {
       unmounted = true;
+      if (rtcTimeout) clearTimeout(rtcTimeout);
       if (frameInterval) clearInterval(frameInterval);
       if (stream) {
         stream.getTracks().forEach(t => t.stop());
       }
+      if (dc) {
+        try { dc.close(); } catch (e) {}
+      }
+      if (pc) {
+        try { pc.close(); } catch (e) {}
+      }
       if (ws) {
-        ws.close();
+        try { ws.close(); } catch (e) {}
       }
       clearSkeletonOverlay();
     };
@@ -298,6 +426,23 @@ export function VideoFeed({
             <Camera size={13} />
             <span>{useLocalCamera ? '📹 Câmera Navegador (Ativa)' : '🖥️ Câmera OpenCV'}</span>
           </button>
+
+          {/* Badge de Protocolo de Transporte */}
+          <div style={{
+            background: transportProtocol.includes('UDP') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(14, 165, 233, 0.15)',
+            border: `1px solid ${transportProtocol.includes('UDP') ? '#10b981' : '#38bdf8'}`,
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.72rem',
+            color: transportProtocol.includes('UDP') ? '#34d399' : '#38bdf8',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px'
+          }}>
+            <Radio size={12} color={transportProtocol.includes('UDP') ? '#10b981' : '#38bdf8'} />
+            <span>{transportProtocol}</span>
+          </div>
 
           {/* Badge de FPS */}
           <div style={{

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createMockStream } from '../services/mockService';
 import logger from '../utils/logger';
+import authClient from '../utils/authClient';
 
 export function useTennisSync() {
   const [isConnected, setIsConnected] = useState(false);
@@ -117,9 +118,7 @@ export function useTennisSync() {
 
     const connectWebSocket = () => {
       if (unmounted) return;
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.hostname || 'localhost';
-      const wsUrl = `${protocol}//${host}:8000/ws/telemetry`;
+      const wsUrl = authClient.getWsUrl('/ws/telemetry');
 
       try {
         const ws = new WebSocket(wsUrl);

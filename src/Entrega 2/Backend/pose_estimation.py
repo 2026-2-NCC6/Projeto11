@@ -55,6 +55,10 @@ import rule_engine
 from models.tennis_transformer import TennisTransformerGPU
 from gamification_engine import GamificationEngine
 from hud_renderer import TennisHUD
+try:
+    from serial_manager import arduino_controller
+except ImportError:
+    from Backend.serial_manager import arduino_controller
 
 MAPA_LEDS = {
     "ombro_dir": b'A', "ombro_esq": b'B',
@@ -230,13 +234,8 @@ class TennisSyncEngine:
             self.latest_replay_filename = "replay_latest.mp4"
             self.latest_replay_url = f"/api/replay/latest?t={int(os.path.getmtime(latest_mp4)*1000)}"
 
-        # Arduino Serial para hardware IoT
-        self.feedback_arduino = None
-        if HAS_SERIAL:
-            try:
-                self.feedback_arduino = serial.Serial(arduino_port, 9600, timeout=0)
-            except Exception as e:
-                self.feedback_arduino = None
+        # Arduino Serial para hardware IoT (gerenciado via ArduinoController singleton)
+        self.feedback_arduino = arduino_controller
 
         self.led_active = False
         self.p_time = time.time()
@@ -529,16 +528,10 @@ class TennisSyncEngine:
                             grade
                         )
 
-                        # Controle de LEDs no Arduino
+                        # Controle de LEDs no Arduino via ArduinoController
                         if self.feedback_arduino is not None:
-                            if failed:
-                                for joint in failed:
-                                    if joint in MAPA_LEDS:
-                                        self.feedback_arduino.write(MAPA_LEDS[joint])
-                                self.led_active = True
-                            elif self.led_active:
-                                self.feedback_arduino.write(b'R')
-                                self.led_active = False
+                            self.feedback_arduino.update_from_ai(failed)
+                            self.led_active = len(failed) > 0
 
                         # Limpa o buffer para não redisparar imediatamente no follow-through
                         self.frame_buffer.clear()
@@ -561,12 +554,9 @@ class TennisSyncEngine:
                     self.current_confidence = 0.0
                     self.current_feedback = "Posicione-se em frente à câmera"
                     self.failed_joints = []
-                    if self.led_active and self.feedback_arduino is not None:
-                        try:
-                            self.feedback_arduino.write(b'R')
-                            self.led_active = False
-                        except Exception:
-                            pass
+                    if self.feedback_arduino is not None:
+                        self.feedback_arduino.update_from_ai([])
+                        self.led_active = False
 
         # -------------------------------------------------------------
         # 4. Expiração da Janela de Exibição de 3.5 segundos
@@ -609,6 +599,12 @@ class TennisSyncEngine:
             "stroke": self.current_stroke_name
         })
 
+        # Mescla LEDs manuais ativados via Web com falhas detectadas pela IA
+        active_joints_list = list(set(self.failed_joints))
+        if self.feedback_arduino is not None:
+            iot_status = self.feedback_arduino.get_status()
+            active_joints_list = list(set(self.failed_joints) | set(iot_status.get("active_joints", [])))
+
         return {
             "timestamp": time.time(),
             "fps": round(self.fps, 1),
@@ -621,8 +617,8 @@ class TennisSyncEngine:
             "feedback": feedback_text,
             "failed_joints": self.failed_joints,
             "angles": self.angles,
-            "led_active": self.led_active,
-            "active_leds": self.failed_joints,
+            "led_active": len(active_joints_list) > 0,
+            "active_leds": active_joints_list,
             "lateralidade": self.lateralidade,
             "athlete_detected": self.athlete_detected,
             "is_dark": self.is_dark,
@@ -645,8 +641,7 @@ class TennisSyncEngine:
     def close(self):
         if self.feedback_arduino is not None:
             try:
-                self.feedback_arduino.write(b'R')
-                self.feedback_arduino.close()
+                self.feedback_arduino.reset_all_leds()
             except Exception:
                 pass
         if self.landmarker is not None:

@@ -144,7 +144,14 @@ export const logger = {
     const method = (options.method || 'GET').toUpperCase();
     const start = Date.now();
     try {
-      const res = await fetch(url, options);
+      // Injeta token JWT se disponível
+      const token = localStorage.getItem('tennisync_access_token');
+      const headers = { ...(options.headers || {}) };
+      if (token && !headers['Authorization']) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const res = await fetch(url, { ...options, headers });
       const durationMs = Date.now() - start;
       if (!res.ok) {
         logger.error(tag, `Requisição HTTP falhou (${method} ${url} -> ${res.status} ${res.statusText}) [${durationMs}ms]`);

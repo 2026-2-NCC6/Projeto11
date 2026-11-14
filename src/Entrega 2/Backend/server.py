@@ -25,7 +25,8 @@ except ImportError:
     HAS_CV2 = False
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from typing import Optional, List, Dict
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends, Request, Response, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
 from pydantic import BaseModel
@@ -36,6 +37,16 @@ except ImportError:
     from Backend.logger import log_debug, log_info, log_warn, log_error, log_exception, log_sampled, get_recent_logs
 
 from pose_estimation import TennisSyncEngine
+from auth import (
+    create_access_token,
+    decode_access_token,
+    get_current_user,
+    get_optional_user,
+    verify_credentials,
+    extract_token_from_request
+)
+from serial_manager import arduino_controller
+from webrtc_service import WebRTCManager, DEFAULT_ICE_SERVERS
 
 # Estado Global do Serviço
 class ServerState:
@@ -43,6 +54,18 @@ class ServerState:
         self.camera_source = 0
         self.lateralidade = "destro"
         self.is_running = True
+        self.camera_paused = False
+        self.use_server_hardware_camera = False  # Prioriza câmera do cliente via WebRTC UDP
+        self.engine = None
+        self.cap = None
+        self.last_client_frame_time = 0.0
+
+        # Slot atômico Latest-Frame (Zero-Lag / Drop frame automático)
+        self.incoming_client_frame = None
+        self.incoming_frame_lock = threading.Lock()
+
+        # WebRTC Manager
+        self.webrtc_mgr = None
         self.camera_paused = False
         self.engine = None
         self.cap = None
@@ -122,6 +145,19 @@ class ServerState:
         self.active_websockets = set()
         self.worker_thread = None
 
+    def set_client_frame(self, frame):
+        """Atualiza atomicamente o frame mais recente enviado pelo cliente (Latest-Frame-Wins)."""
+        with self.incoming_frame_lock:
+            self.incoming_client_frame = frame
+            self.last_client_frame_time = time.time()
+
+    def pop_incoming_frame(self):
+        """Consome o frame mais recente sem travar a rede."""
+        with self.incoming_frame_lock:
+            frame = self.incoming_client_frame
+            self.incoming_client_frame = None
+            return frame
+
 state = ServerState()
 
 class SettingsPayload(BaseModel):
@@ -133,8 +169,25 @@ class AuditActionPayload(BaseModel):
     target_class: str = "forehand"
     replay_filename: str | None = None
 
+class LoginPayload(BaseModel):
+    username: str
+    password: str
+
+class WebRtcOfferPayload(BaseModel):
+    sdp: str
+    type: str
+
+class IotControlPayload(BaseModel):
+    byte: Optional[str] = None
+    joint: Optional[str] = None
+    action: Optional[str] = "toggle"
+    state: Optional[bool] = None
+
 def video_worker():
-    """Thread em segundo plano que executa a captura de vídeo e inferência contínua."""
+    """
+    Thread em segundo plano exclusiva que consome o Latest-Frame atômico do cliente
+    e executa a inferência de IA sem race-condition e com latência mínima.
+    """
     log_info("SYSTEM", "Inicializando motor TennisSyncEngine...")
     try:
         state.engine = TennisSyncEngine(source=state.camera_source, lateralidade=state.lateralidade)
@@ -154,30 +207,28 @@ def video_worker():
     state.latest_jpeg = minimal_jpeg
 
     while state.is_running:
-        # Se a câmera foi liberada para auditoria desktop ou o navegador está enviando frames via WebSocket:
-        if state.camera_paused or (time.time() - state.last_client_frame_time < 2.0):
-            if state.cap is not None and state.cap.isOpened():
-                try:
-                    state.cap.release()
-                except Exception:
-                    pass
-                state.cap = None
-            time.sleep(0.04)
+        if state.camera_paused:
+            time.sleep(0.05)
             continue
 
-        # Modo Câmera do Backend (OpenCV autônomo)
         frame = None
-        if HAS_CV2:
+        # 1. Prioridade absoluta: Frame recebido via UDP (WebRTC) ou WebSocket do Cliente
+        incoming = state.pop_incoming_frame()
+        if incoming is not None:
+            frame = incoming
+            state.last_client_frame_time = time.time()
+        elif time.time() - state.last_client_frame_time < 3.0:
+            # Cliente ativo transmitindo via UDP/WebRTC; dorme pequeno intervalo sem travar
+            time.sleep(0.01)
+            continue
+        elif state.use_server_hardware_camera and HAS_CV2:
+            # Modo Câmera Local do Servidor (OpenCV) apenas se explicitamente habilitado
             if state.cap is None or not state.cap.isOpened():
                 try:
-                    # Tenta DirectShow primeiro para evitar exclusividade MSMF no Windows
                     state.cap = cv2.VideoCapture(state.camera_source, cv2.CAP_DSHOW)
                     if not state.cap.isOpened():
                         state.cap = cv2.VideoCapture(state.camera_source)
-                    if state.cap.isOpened():
-                        log_info("CAM/STREAM", f"Câmera OpenCV aberta com sucesso na fonte: {state.camera_source}")
-                except Exception as e:
-                    log_sampled("cam_open_fail", 3.0, "CAM/STREAM", f"Aguardando disponibilidade da câmera {state.camera_source}...", {"erro": str(e)}, level="WARN")
+                except Exception:
                     state.cap = None
 
             if state.cap is not None and state.cap.isOpened():
@@ -185,7 +236,9 @@ def video_worker():
                 if success and raw_frame is not None:
                     frame = raw_frame
                 else:
-                    time.sleep(0.5)
+                    time.sleep(0.2)
+        else:
+            time.sleep(0.02)
 
         if state.engine is not None and frame is not None:
             try:
@@ -199,21 +252,28 @@ def video_worker():
             if ret:
                 state.latest_jpeg = buffer.tobytes()
 
-        time.sleep(0.033)
+        time.sleep(0.01)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     log_info("SYSTEM", "Servidor FastAPI TenniSync inicializado na porta 8000.")
     state.is_running = True
+    state.webrtc_mgr = WebRTCManager(state)
     state.worker_thread = threading.Thread(target=video_worker, daemon=True)
     state.worker_thread.start()
     yield
     log_info("SYSTEM", "Encerrando servidor FastAPI TenniSync...")
     state.is_running = False
+    if state.webrtc_mgr:
+        try:
+            await state.webrtc_mgr.close_all()
+        except Exception:
+            pass
     if state.cap:
         state.cap.release()
     if state.engine:
         state.engine.close()
+    arduino_controller.close()
 
 app = FastAPI(
     title="TenniSync Web Service API",
@@ -230,8 +290,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+frontend_dist = os.path.abspath(os.path.join(BASE_DIR, "..", "Frontend", "dist"))
+
 @app.get("/")
 def root():
+    index_file = os.path.join(frontend_dist, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     return {
         "service": "TenniSync Web API",
         "version": "2.0.0",
@@ -245,11 +310,109 @@ def get_status():
         "status": "online",
         "lateralidade": state.lateralidade,
         "camera_source": state.camera_source,
-        "camera_connected": (state.cap is not None and state.cap.isOpened()) or (time.time() - state.last_client_frame_time < 2.0),
-        "client_streaming": time.time() - state.last_client_frame_time < 2.0,
-        "arduino_connected": state.engine.feedback_arduino is not None if state.engine else False,
+        "camera_connected": (state.cap is not None and state.cap.isOpened()) or (time.time() - state.last_client_frame_time < 3.0),
+        "client_streaming": time.time() - state.last_client_frame_time < 3.0,
+        "arduino_connected": arduino_controller.is_connected,
         "latest_telemetry": state.latest_telemetry
     }
+
+# ==============================================================================
+# ENDPOINTS DE AUTENTICAÇÃO E SEGURANÇA (JWT + COOKIES + QUERY)
+# ==============================================================================
+@app.post("/api/auth/login")
+def auth_login(payload: LoginPayload, response: Response):
+    """Autentica o usuário com login e senha e emite token JWT com cookie seguro."""
+    if not verify_credentials(payload.username, payload.password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credenciais inválidas. Verifique usuário e senha."
+        )
+
+    token = create_access_token({"sub": payload.username})
+    # Define cookie para tags de mídia HTML5 (<img> e <video>)
+    response.set_cookie(
+        key="tennisync_token",
+        value=token,
+        httponly=False,
+        max_age=86400,
+        samesite="lax",
+        secure=False
+    )
+    log_info("AUTH", f"Usuário '{payload.username}' autenticado com sucesso.")
+    return {
+        "status": "ok",
+        "access_token": token,
+        "token_type": "bearer",
+        "username": payload.username
+    }
+
+@app.get("/api/auth/verify")
+def auth_verify(user: dict = Depends(get_current_user)):
+    """Valida se o token JWT atual ainda é válido."""
+    return {"status": "ok", "user": user.get("sub", "user")}
+
+@app.post("/api/auth/logout")
+def auth_logout(response: Response):
+    """Limpa o cookie de sessão."""
+    response.delete_cookie(key="tennisync_token")
+    return {"status": "ok", "message": "Sessão encerrada com sucesso."}
+
+# ==============================================================================
+# ENDPOINTS DE WEBRTC (STREAMING UDP DE VÍDEO E TELEMETRIA)
+# ==============================================================================
+@app.post("/api/webrtc/offer")
+async def webrtc_offer(payload: WebRtcOfferPayload, user: dict = Depends(get_current_user)):
+    """Recebe a oferta SDP do navegador e estabelece o canal de vídeo UDP."""
+    if not state.webrtc_mgr:
+        raise HTTPException(status_code=500, detail="WebRTC Manager não inicializado.")
+    try:
+        answer = await state.webrtc_mgr.handle_offer(payload.dict())
+        return answer
+    except Exception as e:
+        log_exception("WEBRTC/UDP", "Erro ao processar oferta WebRTC", e)
+        raise HTTPException(status_code=400, detail=f"Falha na negociação SDP: {e}")
+
+@app.get("/api/webrtc/ice_servers")
+def get_ice_servers():
+    """Retorna servidores STUN/TURN públicos para travessia de NAT do cliente."""
+    return {
+        "iceServers": [
+            {"urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]},
+            {"urls": ["stun:stun2.l.google.com:19302", "stun:stun.cloudflare.com:3478"]}
+        ]
+    }
+
+# ==============================================================================
+# ENDPOINTS DE CONTROLE DE HARDWARE IOT (ARDUINO UNO)
+# ==============================================================================
+@app.get("/api/iot/status")
+def get_iot_status():
+    """Retorna o estado das portas, LEDs acionados e modo do Arduino."""
+    return arduino_controller.get_status()
+
+@app.post("/api/iot/leds/control")
+def control_iot_led(payload: IotControlPayload, user: dict = Depends(get_current_user)):
+    """Aciona ou apaga individualmente LEDs no Arduino a partir da interface Web."""
+    target = payload.byte or payload.joint
+    if not target:
+        raise HTTPException(status_code=400, detail="Parâmetro 'byte' (ex: 'A'-'L') ou 'joint' obrigatório.")
+
+    if payload.action == "toggle" or payload.state is None:
+        result = arduino_controller.toggle_led(target)
+    else:
+        desired = bool(payload.state or payload.action == "on")
+        result = arduino_controller.trigger_led(target, desired)
+    return result
+
+@app.post("/api/iot/leds/reset")
+def reset_iot_leds(user: dict = Depends(get_current_user)):
+    """Apaga todos os 12 LEDs do protótipo físico."""
+    return arduino_controller.reset_all_leds()
+
+@app.post("/api/iot/leds/sweep")
+def sweep_iot_leds(user: dict = Depends(get_current_user)):
+    """Inicia teste de bancada varrendo os 12 atuadores sequencialmente."""
+    return arduino_controller.run_sweep_test()
 
 @app.get("/api/telemetry")
 def get_telemetry():
@@ -573,21 +736,14 @@ async def websocket_video(websocket: WebSocket):
                 except Exception as e:
                     log_warn("CAM/STREAM", f"Falha ao decodificar base64 de frame: {e}")
 
-            if raw_bytes and HAS_CV2 and HAS_NUMPY and state.engine:
+            if raw_bytes and HAS_CV2 and HAS_NUMPY:
                 nparr = np.frombuffer(raw_bytes, np.uint8)
                 frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
                 if frame is not None:
-                    state.last_client_frame_time = time.time()
-                    telemetry = state.engine.process_frame(frame, render_hud=False)
-                    state.latest_telemetry = telemetry
-
-                    # Atualiza o buffer JPEG do servidor
-                    ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
-                    if ret:
-                        state.latest_jpeg = buffer.tobytes()
-
-                    # Responde com telemetria e coordenadas dos landmarks 3D
-                    await websocket.send_text(json.dumps(telemetry))
+                    # Deposita no slot atômico para o video_worker processar
+                    state.set_client_frame(frame)
+                    # Responde com o snapshot mais recente da telemetria
+                    await websocket.send_text(json.dumps(state.latest_telemetry))
     except (WebSocketDisconnect, ConnectionResetError):
         log_info("WEBSOCKET", "Cliente desconectado do canal de vídeo (/ws/video)")
     except Exception as e:
@@ -620,6 +776,14 @@ async def websocket_telemetry(websocket: WebSocket):
         log_exception("WEBSOCKET", "Exceção inesperada no canal de telemetria (/ws/telemetry)", e)
     finally:
         state.active_websockets.discard(websocket)
+
+# Monta arquivos estáticos do Frontend compilado (se existirem) para servidor All-in-One
+if os.path.exists(frontend_dist):
+    from fastapi.staticfiles import StaticFiles
+    assets_dir = os.path.join(frontend_dist, "assets")
+    if os.path.exists(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+    log_info("SYSTEM", f"Frontend estático montado com sucesso a partir de {frontend_dist}")
 
 if __name__ == "__main__":
     import uvicorn

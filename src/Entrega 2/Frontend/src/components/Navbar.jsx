@@ -1,5 +1,6 @@
 import React from 'react';
-import { Activity, Play, Pause, RotateCcw, Volume2, VolumeX, Radio, Cpu, User, Gamepad2, Columns, LayoutDashboard } from 'lucide-react';
+import { Activity, Play, Pause, RotateCcw, Volume2, VolumeX, Radio, Cpu, User, Gamepad2, Columns, LayoutDashboard, LogOut } from 'lucide-react';
+import authClient from '../utils/authClient';
 
 export function Navbar({
   isConnected,
@@ -223,6 +224,18 @@ export function Navbar({
             title="Reiniciar sessão e métricas"
           >
             <RotateCcw size={16} />
+          </button>
+
+          {/* Usuário / Logout */}
+          <button
+            onClick={() => authClient.logout()}
+            className="btn btn-secondary"
+            style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '6px', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+            title={`Conectado como ${authClient.getUser()}. Clique para sair.`}
+          >
+            <User size={14} color="#38bdf8" />
+            <span style={{ fontSize: '0.75rem', color: '#cbd5e1' }}>{authClient.getUser()}</span>
+            <LogOut size={13} color="#f87171" />
           </button>
 
         </div>

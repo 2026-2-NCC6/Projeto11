@@ -1,11 +1,24 @@
 # Backend/tests/test_logger.py
 import unittest
 import os
+import sys
 import time
-from Backend.logger import (
-    log_debug, log_info, log_warn, log_error, log_exception, log_sampled,
-    set_level, get_recent_logs, clear_logs, LOG_FILE
-)
+
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.abspath(os.path.join(TEST_DIR, ".."))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
+try:
+    from Backend.logger import (
+        log_debug, log_info, log_warn, log_error, log_exception, log_sampled,
+        set_level, get_recent_logs, clear_logs, LOG_FILE
+    )
+except ImportError:
+    from logger import (
+        log_debug, log_info, log_warn, log_error, log_exception, log_sampled,
+        set_level, get_recent_logs, clear_logs, LOG_FILE
+    )
 
 class TestTenniSyncLogger(unittest.TestCase):
     def setUp(self):

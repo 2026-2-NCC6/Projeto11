@@ -52,6 +52,7 @@ from webrtc_service import WebRTCManager, DEFAULT_ICE_SERVERS
 class ServerState:
     def __init__(self):
         self.camera_source = 0
+        self.resolution = "480p"
         self.lateralidade = "destro"
         self.is_running = True
         self.camera_paused = False
@@ -183,6 +184,17 @@ class IotControlPayload(BaseModel):
     action: Optional[str] = "toggle"
     state: Optional[bool] = None
 
+class IotSidePayload(BaseModel):
+    side: str  # "left" ou "right"
+    state: Optional[bool] = True
+
+class IotConnectPayload(BaseModel):
+    port: Optional[str] = None
+    baudrate: Optional[int] = 9600
+
+class CameraResolutionPayload(BaseModel):
+    resolution: str  # "360p", "480p", "720p"
+
 def video_worker():
     """
     Thread em segundo plano exclusiva que consome o Latest-Frame atômico do cliente
@@ -242,13 +254,31 @@ def video_worker():
 
         if state.engine is not None and frame is not None:
             try:
-                telemetry = state.engine.process_frame(frame, render_hud=False)
+                # Otimização de Resolução / Performance para manter FPS elevado
+                cur_res = getattr(state, "resolution", "480p")
+                max_w = 480 if cur_res == "360p" else (1280 if cur_res == "720p" else 640)
+                if HAS_CV2 and frame.shape[1] > max_w:
+                    fh, fw = frame.shape[:2]
+                    scale = max_w / float(fw)
+                    frame_proc = cv2.resize(frame, (max_w, int(fh * scale)), interpolation=cv2.INTER_AREA)
+                else:
+                    frame_proc = frame
+
+                telemetry = state.engine.process_frame(frame_proc, render_hud=False)
                 state.latest_telemetry = telemetry
             except Exception as e:
                 log_exception("CAM/STREAM", "Erro em process_frame no worker de vídeo", e)
 
         if HAS_CV2 and frame is not None:
-            ret, buffer = cv2.imencode('.jpg', frame, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+            cur_res = getattr(state, "resolution", "480p")
+            max_w = 480 if cur_res == "360p" else (960 if cur_res == "720p" else 640)
+            if frame.shape[1] > max_w:
+                fh, fw = frame.shape[:2]
+                scale = max_w / float(fw)
+                frame_stream = cv2.resize(frame, (max_w, int(fh * scale)), interpolation=cv2.INTER_AREA)
+            else:
+                frame_stream = frame
+            ret, buffer = cv2.imencode('.jpg', frame_stream, [int(cv2.IMWRITE_JPEG_QUALITY), 72])
             if ret:
                 state.latest_jpeg = buffer.tobytes()
 
@@ -404,6 +434,11 @@ def control_iot_led(payload: IotControlPayload, user: dict = Depends(get_current
         result = arduino_controller.trigger_led(target, desired)
     return result
 
+@app.post("/api/iot/leds/side")
+def control_iot_side(payload: IotSidePayload, user: dict = Depends(get_current_user)):
+    """Aciona ou apaga todos os LEDs do lado esquerdo ou direito."""
+    return arduino_controller.trigger_side(payload.side, payload.state if payload.state is not None else True)
+
 @app.post("/api/iot/leds/reset")
 def reset_iot_leds(user: dict = Depends(get_current_user)):
     """Apaga todos os 12 LEDs do protótipo físico."""
@@ -413,6 +448,21 @@ def reset_iot_leds(user: dict = Depends(get_current_user)):
 def sweep_iot_leds(user: dict = Depends(get_current_user)):
     """Inicia teste de bancada varrendo os 12 atuadores sequencialmente."""
     return arduino_controller.run_sweep_test()
+
+@app.get("/api/iot/ports")
+def get_iot_ports():
+    """Lista todas as portas COM disponíveis no PC com identificação de Arduino."""
+    return {"ports": arduino_controller.list_available_ports()}
+
+@app.post("/api/iot/connect")
+def connect_iot(payload: IotConnectPayload, user: dict = Depends(get_current_user)):
+    """Conecta ou altera a porta do Arduino dinamicamente."""
+    return arduino_controller.connect(port=payload.port, baudrate=payload.baudrate)
+
+@app.post("/api/iot/ping")
+def ping_iot(user: dict = Depends(get_current_user)):
+    """Envia byte de ping para o microcontrolador Arduino."""
+    return arduino_controller.ping()
 
 @app.get("/api/telemetry")
 def get_telemetry():
@@ -690,6 +740,30 @@ def resume_camera():
     state.camera_paused = False
     print("[TenniSync Server] Webcam retomada pelo servidor web.", flush=True)
     return {"status": "ok", "camera_paused": False, "message": "Webcam retomada"}
+
+@app.post("/api/camera/resolution")
+def set_camera_resolution(payload: CameraResolutionPayload):
+    """Ajusta a resolução da câmera/processamento para equilibrar FPS e nitidez."""
+    state.resolution = payload.resolution
+    res_map = {
+        "360p": (480, 360),
+        "480p": (640, 480),
+        "720p": (1280, 720)
+    }
+    w, h = res_map.get(payload.resolution, (640, 480))
+    if state.cap is not None and state.cap.isOpened():
+        try:
+            state.cap.set(cv2.CAP_PROP_FRAME_WIDTH, w)
+            state.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
+        except Exception:
+            pass
+    log_info("CAMERA", f"Resolução definida para {payload.resolution} ({w}x{h})")
+    return {"status": "ok", "resolution": payload.resolution, "width": w, "height": h}
+
+@app.get("/api/camera/resolution")
+def get_camera_resolution():
+    """Retorna a resolução atualmente configurada."""
+    return {"status": "ok", "resolution": getattr(state, "resolution", "480p")}
 
 def mjpeg_generator():
     """Gera stream MJPEG compatível com tags <img> do navegador."""

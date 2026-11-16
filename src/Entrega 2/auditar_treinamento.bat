@@ -26,8 +26,15 @@ cd /d "%~dp0"
 :: Notifica o servidor FastAPI em segundo plano para liberar o acesso exclusivo da camera
 curl -s -X POST http://localhost:8000/api/camera/pause >nul 2>&1
 
+where py >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    set "PY_CMD=py -3"
+) else (
+    set "PY_CMD=python"
+)
+
 :: Executa a sessao de auditoria com camera nativa
-py -3.11 Backend\audit_camera_session.py %*
+%PY_CMD% Backend\audit_camera_session.py %*
 
 :: Devolve a camera ao servidor web ao finalizar
 curl -s -X POST http://localhost:8000/api/camera/resume >nul 2>&1

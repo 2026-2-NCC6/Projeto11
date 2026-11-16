@@ -106,6 +106,19 @@ class TestInternetUdpIot(unittest.TestCase):
         self.assertEqual(res_rst.status_code, 200)
         self.assertEqual(len(res_rst.json().get("active_bytes", [])), 0)
 
+        # Listagem de portas COM
+        res_ports = self.client.get("/api/iot/ports")
+        self.assertEqual(res_ports.status_code, 200)
+        self.assertIn("ports", res_ports.json())
+
+        # Ping IoT
+        res_ping = self.client.post("/api/iot/ping", headers=headers)
+        self.assertEqual(res_ping.status_code, 200)
+
+        # Conexão dinâmica
+        res_conn = self.client.post("/api/iot/connect", json={"port": "auto", "baudrate": 9600}, headers=headers)
+        self.assertEqual(res_conn.status_code, 200)
+
     def test_05_webrtc_endpoints(self):
         # Servidores ICE públicos
         res_ice = self.client.get("/api/webrtc/ice_servers")

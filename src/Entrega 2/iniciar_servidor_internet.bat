@@ -42,7 +42,14 @@ if not exist "Frontend\dist" (
     echo.
 )
 
+where py >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    set "PY_CMD=py -3"
+) else (
+    set "PY_CMD=python"
+)
+
 echo [INFO] Iniciando servidor Web backend na porta 8000...
-py -3.11 Backend\server.py
+%PY_CMD% Backend\server.py
 
 pause

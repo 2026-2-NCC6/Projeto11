@@ -69,16 +69,35 @@ void loop() {
   if (Serial.available() > 0) {
     char comando = Serial.read();
 
+    // Ignora caracteres de controle e quebras de linha do terminal serial
+    if (comando == '\n' || comando == '\r' || comando == ' ' || comando == '\t') {
+      return;
+    }
+
     if (comando == 'R') {
       apagarLeds();
       return;
     }
 
+    // Ping / Teste de presenca e handshake com PC
+    if (comando == '?' || comando == 'P') {
+      Serial.println("TennisSync IoT Arduino Uno OK");
+      return;
+    }
+
+    // Comando Maiusculo ('A'-'L'): Acende LED especifico e toca Buzzer
     if (comando >= 'A' && comando <= 'L') {
       int indice = comando - 'A';
       digitalWrite(pinosLeds[indice], HIGH);
       tone(buzzerPin, 1000, 150);
-      Serial.print("Erro em: ");
+      Serial.print("Erro/Ativado em: ");
+      Serial.println(nomesArticulacoes[indice]);
+    }
+    // Comando Minusculo ('a'-'l'): Apaga LED individual sem afetar os demais
+    else if (comando >= 'a' && comando <= 'l') {
+      int indice = comando - 'a';
+      digitalWrite(pinosLeds[indice], LOW);
+      Serial.print("Apagado: ");
       Serial.println(nomesArticulacoes[indice]);
     } else {
       Serial.println("Comando invalido");

@@ -55,7 +55,7 @@ def request_server_camera_resume():
         pass
 
 class AuditCameraSession:
-    def __init__(self, source="0", lateralidade="destro", arduino_port="COM4"):
+    def __init__(self, source="0", lateralidade="destro", arduino_port=None):
         self.source = str(get_usb_camera_source(source))
         self.lateralidade = lateralidade
         self.arduino_port = arduino_port
@@ -293,8 +293,9 @@ class AuditCameraSession:
         cv2.putText(frame, "CORPO IoT (12 LEDs)", (x + 18, y + 24),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.52, (251, 191, 36), 2, cv2.LINE_AA)
         
-        has_arduino = getattr(self.engine, "feedback_arduino", None) is not None
-        status_txt = "Arduino: COM4" if has_arduino else "Arduino: VIRTUAL"
+        has_arduino = getattr(self.engine, "feedback_arduino", None) is not None and getattr(self.engine.feedback_arduino, "is_connected", False)
+        active_port = getattr(self.engine.feedback_arduino, "active_port", "COM") if has_arduino else ""
+        status_txt = f"Arduino: {active_port}" if has_arduino else "Arduino: VIRTUAL"
         status_col = (52, 211, 153) if has_arduino else (56, 189, 248)
         cv2.putText(frame, status_txt, (x + 18, y + 42),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.38, status_col, 1, cv2.LINE_AA)
@@ -527,8 +528,9 @@ class AuditCameraSession:
         cap = cv2.VideoCapture(source_idx)
         if not cap.isOpened() and sys.platform == 'win32' and isinstance(source_idx, int):
             cap = cv2.VideoCapture(source_idx, cv2.CAP_DSHOW)
-        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        # Configura resolução otimizada (640x480) para garantir 30 FPS estáveis sem sobrecarregar a CPU
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
         if not cap.isOpened():
             print(f"[Erro Fatal] Não foi possível abrir a câmera {self.source}")
@@ -704,7 +706,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="TenniSync - Sessão de Auditoria Guiada e Treinamento")
     parser.add_argument("--source", type=str, default=None, help="Índice da câmera (padrão: 0)")
     parser.add_argument("--lateralidade", type=str, default="destro", choices=["destro", "canhoto"], help="Lateralidade do atleta")
-    parser.add_argument("--arduino_port", type=str, default="COM4", help="Porta serial do Arduino Uno (padrão: COM4)")
+    parser.add_argument("--arduino_port", type=str, default=None, help="Porta serial do Arduino Uno (padrão: auto-detecção)")
     args = parser.parse_args()
 
     session = AuditCameraSession(

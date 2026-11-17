@@ -49,6 +49,25 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
   const isAnyLedActive = activeSet.size > 0;
 
   // Dispara acendimento ou desligamento individual do LED no Arduino
+  const handleConnectPort = async (targetPort) => {
+    setIsOperating(true);
+    try {
+      const res = await authClient.fetchWithAuth('/api/iot/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ port: targetPort || 'auto' })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setHwStatus(updated);
+      }
+    } catch (e) {
+      console.warn('Erro ao conectar Arduino:', e);
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
   const handleToggleLed = async (led) => {
     setIsOperating(true);
     try {
@@ -63,6 +82,26 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
       }
     } catch (e) {
       console.warn('Erro ao controlar LED do Arduino:', e);
+    } finally {
+      setIsOperating(false);
+    }
+  };
+
+  // Aciona ou testa todos os LEDs de um lado específico (Esquerdo ou Direito)
+  const handleTestSide = async (side) => {
+    setIsOperating(true);
+    try {
+      const res = await authClient.fetchWithAuth('/api/iot/leds/side', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ side, state: true })
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setHwStatus(updated);
+      }
+    } catch (e) {
+      console.warn(`Erro ao testar lado ${side}:`, e);
     } finally {
       setIsOperating(false);
     }
@@ -111,33 +150,71 @@ export function IotLedMatrix({ failedJoints = [], isConnected = false, compact =
           <span className={`badge ${hwStatus.is_connected ? 'badge-green' : 'badge-amber'}`} style={{ fontSize: '0.65rem' }}>
             {hwStatus.is_connected ? `● Arduino ${hwStatus.port} Conectado` : '● Simulação Virtual'}
           </span>
+          <button
+            onClick={() => handleConnectPort('auto')}
+            disabled={isOperating}
+            className="btn btn-secondary"
+            style={{ padding: '3px 8px', fontSize: '0.65rem', display: 'flex', alignItems: 'center', gap: '4px' }}
+            title="Auto-detectar e reconectar porta do Arduino"
+          >
+            <RefreshCw size={11} className={isOperating ? 'animate-spin' : ''} />
+            <span>Reconectar</span>
+          </button>
         </div>
       </div>
 
-      {/* Barra de Ações Rápidas (Varredura e Reset Geral) */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+      {/* Barra de Ações Rápidas (Lado Esquerdo, Lado Direito, Varredura e Reset Geral) */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+        <button
+          onClick={() => handleTestSide('left')}
+          disabled={isOperating}
+          className="btn btn-secondary"
+          style={{ padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', borderColor: 'rgba(56, 189, 248, 0.4)' }}
+          title="Acende os 6 LEDs do Lado Esquerdo (B, D, F, H, J, L)"
+        >
+          <Zap size={13} color="#38bdf8" />
+          <span>Testar Lado Esquerdo (6 LEDs)</span>
+        </button>
+
+        <button
+          onClick={() => handleTestSide('right')}
+          disabled={isOperating}
+          className="btn btn-secondary"
+          style={{ padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', borderColor: 'rgba(245, 158, 11, 0.4)' }}
+          title="Acende os 6 LEDs do Lado Direito (A, C, E, G, I, K)"
+        >
+          <Zap size={13} color="#f59e0b" />
+          <span>Testar Lado Direito (6 LEDs)</span>
+        </button>
+
         <button
           onClick={handleSweepTest}
           disabled={isOperating}
           className="btn btn-secondary"
-          style={{ flex: 1, padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
+          style={{ padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}
           title="Aciona sequencialmente os 12 LEDs para teste físico de bancada"
         >
-          <Zap size={13} color="#f59e0b" />
-          <span>Testar Varredura</span>
+          <Activity size={13} color="#10b981" />
+          <span>Varredura Completa</span>
         </button>
 
         <button
           onClick={handleResetLeds}
           disabled={isOperating}
           className="btn btn-secondary"
-          style={{ flex: 1, padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+          style={{ padding: '6px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', borderColor: 'rgba(239, 68, 68, 0.3)' }}
           title="Envia comando 'R' para apagar todos os LEDs físicos"
         >
           <RefreshCw size={13} color="#f87171" />
           <span>Apagar Todos ('R')</span>
         </button>
       </div>
+
+      {hwStatus.recent_messages && hwStatus.recent_messages.length > 0 && (
+        <div style={{ fontSize: '0.68rem', color: '#38bdf8', background: 'rgba(56, 189, 248, 0.08)', padding: '5px 10px', borderRadius: '4px', borderLeft: '3px solid #38bdf8', fontFamily: 'monospace' }}>
+          Echo Arduino: {hwStatus.recent_messages[hwStatus.recent_messages.length - 1].message}
+        </div>
+      )}
 
       <p style={{ fontSize: '0.74rem', color: '#94a3b8', margin: 0 }}>
         Clique em qualquer articulação do corpo virtual para ligar ou desligar o LED físico correspondente no Arduino.

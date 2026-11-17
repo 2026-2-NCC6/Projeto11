@@ -95,3 +95,63 @@ def get_torso_rotation_angle(landmarks):
     dot = np.dot(vec_shoulders, vec_hips) / (norm_s * norm_h)
     angle = np.degrees(np.arccos(np.clip(dot, -1.0, 1.0)))
     return float(angle)
+
+def get_wrist_angle(landmarks, side='right'):
+    """Calcula o ângulo do pulso (Cotovelo -> Pulso -> Dedo Indicador)."""
+    # Direito: Cotovelo (14), Pulso (16), Dedo Indicador (20)
+    # Esquerdo: Cotovelo (13), Pulso (15), Dedo Indicador (19)
+    if side == 'right':
+        a = get_landmark_coord(landmarks[14])
+        b = get_landmark_coord(landmarks[16])
+        c = get_landmark_coord(landmarks[20])
+    else:
+        a = get_landmark_coord(landmarks[13])
+        b = get_landmark_coord(landmarks[15])
+        c = get_landmark_coord(landmarks[19])
+    return calculate_angle(a, b, c)
+
+def get_hip_angle(landmarks, side='right'):
+    """Calcula o ângulo de flexão do quadril (Ombro -> Quadril -> Joelho)."""
+    # Direito: Ombro (12), Quadril (24), Joelho (26)
+    # Esquerdo: Ombro (11), Quadril (23), Joelho (25)
+    if side == 'right':
+        a = get_landmark_coord(landmarks[12])
+        b = get_landmark_coord(landmarks[24])
+        c = get_landmark_coord(landmarks[26])
+    else:
+        a = get_landmark_coord(landmarks[11])
+        b = get_landmark_coord(landmarks[23])
+        c = get_landmark_coord(landmarks[25])
+    return calculate_angle(a, b, c)
+
+def get_ankle_angle(landmarks, side='right'):
+    """Calcula o ângulo do tornozelo (Joelho -> Tornozelo -> Ponta do Pé)."""
+    # Direito: Joelho (26), Tornozelo (28), Ponta do Pé (32)
+    # Esquerdo: Joelho (25), Tornozelo (27), Ponta do Pé (31)
+    if side == 'right':
+        a = get_landmark_coord(landmarks[26])
+        b = get_landmark_coord(landmarks[28])
+        c = get_landmark_coord(landmarks[32])
+    else:
+        a = get_landmark_coord(landmarks[25])
+        b = get_landmark_coord(landmarks[27])
+        c = get_landmark_coord(landmarks[31])
+    return calculate_angle(a, b, c)
+
+def get_stance_ratio(landmarks):
+    """
+    Calcula a proporção da largura da base dos pés em relação à largura dos ombros.
+    Distância (Tornozelo E - Tornozelo D) / Distância (Ombro E - Ombro D).
+    Valor normal atlético no tênis: entre 0.95 e 1.8.
+    """
+    sh_l = np.array(get_landmark_coord(landmarks[11])[:2])
+    sh_r = np.array(get_landmark_coord(landmarks[12])[:2])
+    ank_l = np.array(get_landmark_coord(landmarks[27])[:2])
+    ank_r = np.array(get_landmark_coord(landmarks[28])[:2])
+
+    sh_dist = np.linalg.norm(sh_l - sh_r)
+    ank_dist = np.linalg.norm(ank_l - ank_r)
+
+    if sh_dist < 1e-4:
+        return 1.0
+    return float(ank_dist / sh_dist)

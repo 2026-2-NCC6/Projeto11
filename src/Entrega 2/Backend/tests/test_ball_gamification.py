@@ -1,6 +1,17 @@
 import unittest
+import os
+import sys
 import time
-from Backend.gamification_engine import GamificationEngine
+
+TEST_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.abspath(os.path.join(TEST_DIR, ".."))
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
+try:
+    from Backend.gamification_engine import GamificationEngine
+except ImportError:
+    from gamification_engine import GamificationEngine
 
 class TestBallGamification(unittest.TestCase):
     def setUp(self):

@@ -25,7 +25,14 @@ echo   [S]      : Pular este golpe
 echo   [Q]      : Sair e salvar o progresso
 echo ======================================================================
 echo.
-py -3.11 Backend\record_batch_golpes.py --start 1 --end 10
+where py >nul 2>&1
+if %ERRORLEVEL% EQU 0 (
+    set "PY_CMD=py -3"
+) else (
+    set "PY_CMD=python"
+)
+
+%PY_CMD% Backend\record_batch_golpes.py --start 1 --end 10
 echo.
 echo Sessao de regravacao concluida!
 pause

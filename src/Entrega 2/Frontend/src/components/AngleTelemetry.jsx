@@ -39,6 +39,24 @@ export function AngleTelemetry({ angles = {}, currentStroke }) {
       min: 60,
       max: 180,
       isCorrect: currentStroke === 'Saque' ? (angles.knee_l ?? 150) <= 150 : true
+    },
+    {
+      id: 'shoulder_r',
+      name: 'Ombro Direito',
+      value: angles.shoulder_r ?? 90,
+      target: 'Abertura ideal: 32° a 125°',
+      min: 20,
+      max: 180,
+      isCorrect: (angles.shoulder_r ?? 90) >= 32
+    },
+    {
+      id: 'shoulder_l',
+      name: 'Ombro Esquerdo',
+      value: angles.shoulder_l ?? 90,
+      target: 'Abertura ideal: 32° a 125°',
+      min: 20,
+      max: 180,
+      isCorrect: (angles.shoulder_l ?? 90) >= 32
     }
   ];
 

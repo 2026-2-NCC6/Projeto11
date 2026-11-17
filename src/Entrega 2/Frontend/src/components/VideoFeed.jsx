@@ -18,6 +18,12 @@ const POSE_CONNECTIONS = [
   [24, 26], [26, 28]
 ];
 
+const RESOLUTION_CONFIGS = {
+  '360p': { width: 480, height: 360, maxTarget: 480, intervalMs: 33, label: '360p (Ultra)' },
+  '480p': { width: 640, height: 480, maxTarget: 640, intervalMs: 33, label: '480p (Rápido)' },
+  '720p': { width: 1280, height: 720, maxTarget: 960, intervalMs: 40, label: '720p (HD)' }
+};
+
 export function VideoFeed({
   isConnected,
   isDemoMode,
@@ -34,10 +40,20 @@ export function VideoFeed({
   containerHeight = '460px'
 }) {
   const [useLocalCamera, setUseLocalCamera] = useState(true);
+  const [resolution, setResolution] = useState('480p');
   const [cameraReady, setCameraReady] = useState(false);
   const [transportProtocol, setTransportProtocol] = useState('Iniciando...');
   const [streamError, setStreamError] = useState(null);
   const [streamKey, setStreamKey] = useState(Date.now());
+
+  const handleResolutionChange = (newRes) => {
+    setResolution(newRes);
+    authClient.fetchWithAuth('/api/camera/resolution', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolution: newRes })
+    }).catch(() => {});
+  };
 
   // Atualiza a chave do stream quando a conexão é restabelecida
   useEffect(() => {
@@ -88,12 +104,19 @@ export function VideoFeed({
       const p = landmarks[idx];
       if (!p || (p[2] ?? 1) <= 0.35) continue;
 
-      const isFailed = (failed.includes('cotovelo_dir') && idx === 14) ||
-                       (failed.includes('cotovelo_esq') && idx === 13) ||
-                       (failed.includes('joelho_dir') && idx === 26) ||
-                       (failed.includes('joelho_esq') && idx === 25) ||
+      // Verificação completa das 12 articulações anatômicas (Direita e Esquerda)
+      const isFailed = (failed.includes('ombro_esq') && idx === 11) ||
                        (failed.includes('ombro_dir') && idx === 12) ||
-                       (failed.includes('ombro_esq') && idx === 11);
+                       (failed.includes('cotovelo_esq') && idx === 13) ||
+                       (failed.includes('cotovelo_dir') && idx === 14) ||
+                       (failed.includes('pulso_esq') && idx === 15) ||
+                       (failed.includes('pulso_dir') && idx === 16) ||
+                       (failed.includes('quadril_esq') && idx === 23) ||
+                       (failed.includes('quadril_dir') && idx === 24) ||
+                       (failed.includes('joelho_esq') && idx === 25) ||
+                       (failed.includes('joelho_dir') && idx === 26) ||
+                       (failed.includes('tornozelo_esq') && idx === 27) ||
+                       (failed.includes('tornozelo_dir') && idx === 28);
 
       ctx.beginPath();
       ctx.arc(p[0] * width, p[1] * height, isFailed ? 7 : 5, 0, 2 * Math.PI);
@@ -179,11 +202,12 @@ export function VideoFeed({
       }
     };
 
-    // Abre a câmera do navegador via getUserMedia
+    // Abre a câmera do navegador via getUserMedia com perfil dinâmico de resolução
+    const cfg = RESOLUTION_CONFIGS[resolution] || RESOLUTION_CONFIGS['480p'];
     navigator.mediaDevices.getUserMedia({
       video: {
-        width: { ideal: 640 },
-        height: { ideal: 480 },
+        width: { ideal: cfg.width },
+        height: { ideal: cfg.height },
         frameRate: { ideal: 30, max: 30 }
       },
       audio: false
@@ -205,24 +229,24 @@ export function VideoFeed({
             setStreamError(null);
 
             // Preservação de proporção anatômica (Aspect Ratio)
-            const vw = videoRef.current.videoWidth || 640;
-            const vh = videoRef.current.videoHeight || 480;
+            const vw = videoRef.current.videoWidth || cfg.width;
+            const vh = videoRef.current.videoHeight || cfg.height;
             if (overlayCanvasRef.current) {
               overlayCanvasRef.current.width = vw;
               overlayCanvasRef.current.height = vh;
             }
             if (offscreenCanvasRef.current) {
-              let targetW = 640;
-              let targetH = Math.round((vh / vw) * 640);
+              let targetW = cfg.maxTarget;
+              let targetH = Math.round((vh / vw) * cfg.maxTarget);
               if (vh > vw) {
-                targetH = 640;
-                targetW = Math.round((vw / vh) * 640);
+                targetH = cfg.maxTarget;
+                targetW = Math.round((vw / vh) * cfg.maxTarget);
               }
               offscreenCanvasRef.current.width = targetW;
               offscreenCanvasRef.current.height = targetH;
             }
 
-            logger.info('CAM/STREAM', `Webcam iniciada: ${vw}x${vh} @ 30 FPS.`);
+            logger.info('CAM/STREAM', `Webcam iniciada em ${resolution}: ${vw}x${vh} @ 30 FPS.`);
           };
         }
 
@@ -353,7 +377,7 @@ export function VideoFeed({
               }
             }, 'image/jpeg', 0.65);
           }
-        }, 40); // 25 FPS
+        }, cfg.intervalMs || 33);
       })
       .catch((err) => {
         if (unmounted) return;
@@ -379,7 +403,7 @@ export function VideoFeed({
       }
       clearSkeletonOverlay();
     };
-  }, [useLocalCamera, renderSkeletonOverlay, clearSkeletonOverlay, onTelemetryUpdate]);
+  }, [useLocalCamera, resolution, renderSkeletonOverlay, clearSkeletonOverlay, onTelemetryUpdate]);
 
   return (
     <div className="glass-panel" style={{ overflow: 'hidden', position: 'relative', display: 'flex', flexDirection: 'column' }}>
@@ -442,6 +466,72 @@ export function VideoFeed({
           }}>
             <Radio size={12} color={transportProtocol.includes('UDP') ? '#10b981' : '#38bdf8'} />
             <span>{transportProtocol}</span>
+          </div>
+
+          {/* Seletor de Resolução / Performance para Máximo FPS */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            background: 'rgba(15, 23, 42, 0.85)',
+            borderRadius: '6px',
+            padding: '2px',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            gap: '2px'
+          }}>
+            <button
+              type="button"
+              onClick={() => handleResolutionChange('360p')}
+              style={{
+                background: resolution === '360p' ? '#0ea5e9' : 'transparent',
+                color: resolution === '360p' ? '#ffffff' : '#94a3b8',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '3px 7px',
+                fontSize: '0.72rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+              title="360p (480x360): Ultra Leve, FPS Máximo para computadores sem GPU dedicada"
+            >
+              🚀 360p
+            </button>
+            <button
+              type="button"
+              onClick={() => handleResolutionChange('480p')}
+              style={{
+                background: resolution === '480p' ? '#10b981' : 'transparent',
+                color: resolution === '480p' ? '#ffffff' : '#94a3b8',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '3px 7px',
+                fontSize: '0.72rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+              title="480p (640x480): Recomendado. Equilíbrio ideal entre alta precisão biomecânica e 30 FPS"
+            >
+              ⚡ 480p
+            </button>
+            <button
+              type="button"
+              onClick={() => handleResolutionChange('720p')}
+              style={{
+                background: resolution === '720p' ? '#8b5cf6' : 'transparent',
+                color: resolution === '720p' ? '#ffffff' : '#94a3b8',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '3px 7px',
+                fontSize: '0.72rem',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s'
+              }}
+              title="720p (1280x720): Imagem HD nítida (requer mais CPU)"
+            >
+              🎬 720p
+            </button>
           </div>
 
           {/* Badge de FPS */}

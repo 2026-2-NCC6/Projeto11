@@ -185,7 +185,7 @@ class TennisSyncEngine:
     - Cooldown anti-falsos positivos de 2.5 segundos.
     - Exportador automático do clipe de replay .mp4 para o frontend.
     """
-    def __init__(self, source="0", lateralidade="destro", arduino_port="COM4"):
+    def __init__(self, source="0", lateralidade="destro", arduino_port=None):
         # DIRETRIZ ESTRITA: Câmera integrada do notebook é permanentemente bloqueada
         if source == "0" or source == 0 or is_camera_blacklisted(source):
             self.source = get_usb_camera_source(source)
@@ -241,6 +241,8 @@ class TennisSyncEngine:
 
         # Arduino Serial para hardware IoT (gerenciado via ArduinoController singleton)
         self.feedback_arduino = arduino_controller
+        if arduino_port and arduino_port.upper() != "AUTO" and not arduino_controller.is_connected:
+            arduino_controller.connect(port=arduino_port)
 
         self.led_active = False
         self.p_time = time.time()
@@ -572,7 +574,11 @@ class TennisSyncEngine:
                 self.current_stroke_name = "Repouso"
                 self.current_confidence = 0.0
                 self.current_feedback = "Atleta em campo - pronto para golpear"
-                self.failed_joints = []
+                if self.failed_joints or self.led_active:
+                    self.failed_joints = []
+                    self.led_active = False
+                    if self.feedback_arduino is not None:
+                        self.feedback_arduino.update_from_ai([])
 
         # Renderizar HUD Arcade sobre o frame se solicitado
         if render_hud and HAS_CV2 and frame is not None:
